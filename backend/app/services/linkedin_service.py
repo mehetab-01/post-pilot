@@ -27,17 +27,16 @@ def _headers(access_token: str) -> dict:
 
 
 def _get_profile_urn(access_token: str) -> tuple[str, str]:
-    """Return (urn, display_name) for the token owner."""
+    """Return (urn, display_name) for the token owner using OpenID Connect userinfo."""
     with httpx.Client(timeout=_TIMEOUT) as client:
         resp = client.get(
-            f"{_BASE}/me",
+            f"{_BASE}/userinfo",
             headers=_headers(access_token),
-            params={"projection": "(id,localizedFirstName,localizedLastName)"},
         )
     resp.raise_for_status()
     data = resp.json()
-    urn = f"urn:li:person:{data['id']}"
-    name = f"{data.get('localizedFirstName', '')} {data.get('localizedLastName', '')}".strip()
+    urn = f"urn:li:person:{data['sub']}"
+    name = data.get("name") or f"{data.get('given_name', '')} {data.get('family_name', '')}".strip() or "LinkedIn User"
     return urn, name
 
 

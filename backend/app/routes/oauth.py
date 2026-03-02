@@ -104,18 +104,15 @@ async def _exchange_linkedin(code: str) -> dict:
         access_token = data["access_token"]
         expires_in   = data.get("expires_in", 5184000)  # ~60 days default
 
-        # Fetch profile to get display name
+        # Fetch profile to get display name (OpenID Connect userinfo)
         me_resp = await client.get(
-            "https://api.linkedin.com/v2/me",
-            params={"projection": "(id,localizedFirstName,localizedLastName)"},
+            "https://api.linkedin.com/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
         )
         name = "LinkedIn User"
         if me_resp.status_code == 200:
             me = me_resp.json()
-            first = me.get("localizedFirstName", "")
-            last  = me.get("localizedLastName", "")
-            name  = f"{first} {last}".strip() or "LinkedIn User"
+            name = me.get("name") or f"{me.get('given_name', '')} {me.get('family_name', '')}".strip() or "LinkedIn User"
 
     return {
         "access_token": access_token,
