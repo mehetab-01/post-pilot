@@ -58,6 +58,7 @@ export function PostPreviewGrid({
   generatedPosts,
   selectedPlatforms,
   context,
+  connections = {},
   onUpdate,
   onPost,
 }) {
@@ -91,6 +92,7 @@ export function PostPreviewGrid({
                 postData={generatedPosts[platform]}
                 context={context}
                 platformConfig={selectedPlatforms[platform]}
+                isConnected={connections[platform] ?? null}
                 onUpdate={(patch) => onUpdate(platform, patch)}
                 onPost={(result) => onPost(platform, result)}
               />

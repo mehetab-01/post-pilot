@@ -121,7 +121,7 @@ function PlatformContent({ platform, raw, content }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function PostPreview({ platform, postData, context, platformConfig, onUpdate, onPost }) {
+export function PostPreview({ platform, postData, context, platformConfig, isConnected = null, onUpdate, onPost }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const textareaRef = useRef(null)
@@ -229,6 +229,7 @@ export function PostPreview({ platform, postData, context, platformConfig, onUpd
           postData={postData}
           context={context}
           platformConfig={platformConfig}
+          isConnected={isConnected}
           isEditing={isEditing}
           onToggleEdit={handleToggleEdit}
           onUpdate={onUpdate}

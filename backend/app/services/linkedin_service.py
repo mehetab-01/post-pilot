@@ -1,15 +1,8 @@
 # LinkedIn posting service using LinkedIn API v2 via httpx.
-#
-# NOTE: In production this would require a full OAuth 2.0 flow to obtain the
-# access_token.  The implementation below assumes the user has already completed
-# OAuth and stored their personal access token (or a long-lived member token)
-# via the settings API.  The token must have the scopes:
-#   w_member_social  (posting)
-#   r_liteprofile    (reading name/urn)
-#
 # LinkedIn API reference:
 #   https://learn.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/ugc-post-api
 
+import re
 from typing import Optional
 
 import httpx
@@ -24,6 +17,53 @@ def _headers(access_token: str) -> dict:
         "Content-Type": "application/json",
         "X-Restli-Protocol-Version": "2.0.0",
     }
+
+
+def _parse_annotations(text: str) -> tuple[str, list]:
+    """Parse **bold** and *italic* markdown into LinkedIn annotation format.
+    Returns (clean_text, annotations_list)."""
+    annotations = []
+    result = ""
+    last_end = 0
+
+    # Bold: **text**
+    for m in re.finditer(r'\*\*(.+?)\*\*', text, re.DOTALL):
+        result += text[last_end:m.start()]
+        start = len(result)
+        inner = m.group(1)
+        result += inner
+        annotations.append({
+            "start": start, "length": len(inner),
+            "value": {"com.linkedin.common.BoldAnnotation": {}},
+        })
+        last_end = m.end()
+    result += text[last_end:]
+
+    # Italic: *text* (single, not double)
+    text2, result2 = result, ""
+    last_end = 0
+    adjusted = []
+    for m in re.finditer(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', text2, re.DOTALL):
+        result2 += text2[last_end:m.start()]
+        start = len(result2)
+        inner = m.group(1)
+        result2 += inner
+        adjusted.append({
+            "start": start, "length": len(inner),
+            "value": {"com.linkedin.common.ItalicAnnotation": {}},
+        })
+        last_end = m.end()
+    result2 += text2[last_end:]
+
+    # Re-adjust bold annotation positions after italic removal
+    shift = 0
+    final_bold = []
+    for a in annotations:
+        final_bold.append({"start": a["start"] - shift, "length": a["length"], "value": a["value"]})
+
+    all_annotations = final_bold + adjusted
+    all_annotations.sort(key=lambda x: x["start"])
+    return result2, all_annotations
 
 
 def _get_profile_urn(access_token: str) -> tuple[str, str]:
@@ -47,8 +87,13 @@ def post_to_linkedin(
 ) -> dict:
     author_urn, display_name = _get_profile_urn(access_token)
 
+    clean_text, annotations = _parse_annotations(content)
+    share_commentary: dict = {"text": clean_text}
+    if annotations:
+        share_commentary["attributes"] = annotations
+
     share_content: dict = {
-        "shareCommentary": {"text": content},
+        "shareCommentary": share_commentary,
         "shareMediaCategory": "NONE",
     }
 

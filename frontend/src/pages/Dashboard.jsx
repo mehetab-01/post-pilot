@@ -13,6 +13,8 @@ import { PostPreviewGrid } from '@/components/dashboard/PostPreviewGrid'
 import { PublishBar } from '@/components/dashboard/PublishBar'
 import { PublishModal } from '@/components/dashboard/PublishModal'
 import { generatePosts, postToPlatform } from '@/services/generate'
+import { getConnections } from '@/services/oauth'
+import { settingsApi } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
 
 // ── API key warning banner ─────────────────────────────────────────────────────
@@ -99,6 +101,9 @@ export default function Dashboard() {
   const [isGenerating, setIsGenerating]  = useState(false)
   const [generatedPosts, setGenerated]   = useState({})
 
+  // ── Connections state ──
+  const [connections, setConnections] = useState({})
+
   // ── Publish state ──
   const [showPublishModal, setShowPublish] = useState(false)
   const [isPublishing, setIsPublishing]   = useState(false)
@@ -113,6 +118,18 @@ export default function Dashboard() {
 
   // Page title
   useEffect(() => { document.title = 'Create | PostPilot' }, [])
+
+  // Fetch OAuth connections + Twitter keys on mount
+  useEffect(() => {
+    Promise.all([getConnections(), settingsApi.getKeys()]).then(([oauthConns, keysRes]) => {
+      const twitterKeys = keysRes.data?.find?.(p => p.platform === 'twitter')?.keys ?? []
+      setConnections({
+        linkedin: oauthConns.linkedin?.connected ?? false,
+        reddit: oauthConns.reddit?.connected ?? false,
+        twitter: twitterKeys.length > 0,
+      })
+    }).catch(() => {})
+  }, [])
 
   // Stagger entrance animation on mount
   useEffect(() => {
@@ -327,6 +344,7 @@ export default function Dashboard() {
             generatedPosts={generatedPosts}
             selectedPlatforms={selectedPlatforms}
             context={context}
+            connections={connections}
             onUpdate={handleUpdate}
             onPost={handleSinglePostResult}
           />

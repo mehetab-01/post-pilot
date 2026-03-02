@@ -1,11 +1,15 @@
 import { useState, useCallback } from 'react'
 import {
-  RefreshCw, Wand2, HeartHandshake, Pencil, Copy, Check, Send, Clipboard, Share2,
+  RefreshCw, Wand2, HeartHandshake, Pencil, Copy, Check, Send, Clipboard, Share2, LinkIcon,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
 import { regeneratePost, enhancePost, humanizePost, postToPlatform } from '@/services/generate'
 import { PLATFORM_MAP } from './constants'
+
+// Platforms that need an OAuth/key connection to post directly
+const NEEDS_CONNECTION = ['linkedin', 'reddit', 'twitter']
 
 function ActionBtn({ icon: Icon, label, onClick, color, loading, title, className }) {
   return (
@@ -36,18 +40,23 @@ export function PostActions({
   postData,
   context,
   platformConfig,
+  isConnected = null,
   isEditing,
   onToggleEdit,
   onUpdate,
   onPost,
 }) {
-  const [copied, setCopied]             = useState(false)
-  const [loadingAction, setAction]      = useState(null)
-  const [posting, setPosting]           = useState(false)
+  const [copied, setCopied]        = useState(false)
+  const [loadingAction, setAction] = useState(null)
+  const [posting, setPosting]      = useState(false)
+  const navigate = useNavigate()
 
-  const cfg    = PLATFORM_MAP[platform]
-  const tone   = platformConfig?.tone ?? 'professional'
-  const options= platformConfig?.options ?? {}
+  const cfg     = PLATFORM_MAP[platform]
+  const tone    = platformConfig?.tone ?? 'professional'
+  const options = platformConfig?.options ?? {}
+
+  // isConnected===null means we don't know yet (loading); treat as connected to avoid flicker
+  const notConnected = NEEDS_CONNECTION.includes(platform) && isConnected === false
 
   const run = useCallback(async (name, fn) => {
     setAction(name)
@@ -96,17 +105,12 @@ export function PostActions({
   }
 
   async function handlePost() {
-    if (platform === 'instagram') {
-      handleCopy()
-      return
-    }
+    if (platform === 'instagram') { handleCopy(); return }
     if (platform === 'whatsapp') {
-      const url = `https://wa.me/?text=${encodeURIComponent(postData.content)}`
-      window.open(url, '_blank', 'noopener')
+      window.open(`https://wa.me/?text=${encodeURIComponent(postData.content)}`, '_blank', 'noopener')
       return
     }
 
-    // Real posting for twitter / linkedin / reddit
     setPosting(true)
     try {
       const postOptions = platform === 'reddit'
@@ -133,53 +137,76 @@ export function PostActions({
                   : Send
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <ActionBtn icon={RefreshCw}     label="Regenerate" onClick={handleRegenerate} loading={loadingAction === 'regenerate'} />
-      <ActionBtn icon={Wand2}         label="Enhance"    onClick={handleEnhance}    loading={loadingAction === 'enhance'}    />
-      <ActionBtn icon={HeartHandshake}label="Humanize"   onClick={handleHumanize}   loading={loadingAction === 'humanize'}   />
-      <ActionBtn
-        icon={isEditing ? Check : Pencil}
-        label={isEditing ? 'Done' : 'Edit'}
-        onClick={onToggleEdit}
-        className={isEditing ? 'text-amber border-amber/40 bg-amber/10 hover:border-amber/40' : ''}
-      />
-      <ActionBtn
-        icon={copied ? Check : Copy}
-        label={copied ? 'Copied!' : 'Copy'}
-        onClick={handleCopy}
-        className={copied ? 'text-green-400' : ''}
-      />
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-1">
+        <ActionBtn icon={RefreshCw}      label="Regenerate" onClick={handleRegenerate} loading={loadingAction === 'regenerate'} />
+        <ActionBtn icon={Wand2}          label="Enhance"    onClick={handleEnhance}    loading={loadingAction === 'enhance'}    />
+        <ActionBtn icon={HeartHandshake} label="Humanize"   onClick={handleHumanize}   loading={loadingAction === 'humanize'}   />
+        <ActionBtn
+          icon={isEditing ? Check : Pencil}
+          label={isEditing ? 'Done' : 'Edit'}
+          onClick={onToggleEdit}
+          className={isEditing ? 'text-amber border-amber/40 bg-amber/10 hover:border-amber/40' : ''}
+        />
+        <ActionBtn
+          icon={copied ? Check : Copy}
+          label={copied ? 'Copied!' : 'Copy'}
+          onClick={handleCopy}
+          className={copied ? 'text-green-400' : ''}
+        />
 
-      {/* Spacer */}
-      <div className="flex-1" />
+        {/* Spacer */}
+        <div className="flex-1" />
 
-      {/* Post button */}
-      <button
-        type="button"
-        onClick={handlePost}
-        disabled={posting || !!postData.posted}
-        className={clsx(
-          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold',
-          'transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed',
-          'border',
-          postData.posted
-            ? 'text-green-400 border-green-900 bg-green-950'
-            : 'border-transparent hover:border-transparent',
+        {/* Post button — or copy-draft fallback if not connected */}
+        {notConnected ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted hover:text-text hover:bg-surface-2 transition-all"
+            >
+              <Clipboard size={13} />
+              <span className="hidden sm:inline">Copy Draft</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber/30 text-amber hover:bg-amber/10 transition-all"
+            >
+              <LinkIcon size={13} />
+              <span className="hidden sm:inline">Connect {cfg?.label ?? platform}</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handlePost}
+            disabled={posting || !!postData.posted}
+            className={clsx(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold',
+              'transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed',
+              'border',
+              postData.posted
+                ? 'text-green-400 border-green-900 bg-green-950'
+                : 'border-transparent hover:border-transparent',
+            )}
+            style={!postData.posted ? {
+              color: '#09090b',
+              background: cfg?.color ?? '#f59e0b',
+              boxShadow: `0 0 12px rgba(${cfg?.rgb ?? '245,158,11'},0.3)`,
+            } : {}}
+          >
+            {posting
+              ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+              : <PostIcon size={13} />
+            }
+            <span className="hidden sm:inline">
+              {postData.posted ? 'Posted' : postLabel}
+            </span>
+          </button>
         )}
-        style={!postData.posted ? {
-          color: '#09090b',
-          background: cfg?.color ?? '#f59e0b',
-          boxShadow: `0 0 12px rgba(${cfg?.rgb ?? '245,158,11'},0.3)`,
-        } : {}}
-      >
-        {posting
-          ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-          : <PostIcon size={13} />
-        }
-        <span className="hidden sm:inline">
-          {postData.posted ? 'Posted' : postLabel}
-        </span>
-      </button>
+      </div>
     </div>
   )
 }
