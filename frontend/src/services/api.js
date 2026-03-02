@@ -70,8 +70,8 @@ export const settingsApi = {
 
 // ── Generate ──────────────────────────────────────────────────────────────────
 export const generateApi = {
-  generate: (context, platforms, additional_instructions) =>
-    api.post('/api/generate', { context, platforms, additional_instructions }),
+  generate: (context, platforms, additional_instructions, length = 'medium') =>
+    api.post('/api/generate', { context, platforms, additional_instructions, length }),
 
   regenerate: (platform, context, tone, options) =>
     api.post('/api/generate/regenerate', { platform, context, tone, options }),

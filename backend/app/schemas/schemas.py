@@ -109,6 +109,7 @@ class GenerateRequest(BaseModel):
     context: str
     platforms: Dict[str, Dict[str, Any]]
     additional_instructions: Optional[str] = None
+    length: str = "medium"
 
 
 class RegenerateRequest(BaseModel):

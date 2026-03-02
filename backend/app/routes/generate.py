@@ -53,6 +53,7 @@ async def generate(
             context=payload.context,
             platforms=payload.platforms,
             additional_instructions=payload.additional_instructions,
+            length=payload.length,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

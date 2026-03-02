@@ -8,8 +8,8 @@ import { generateApi, postApi, mediaApi } from './api'
  * @param {number[]} mediaIds  IDs of already-uploaded Media records
  * @returns {Promise<{ generated: Array, posting_tips: object }>}
  */
-export async function generatePosts(context, platforms, additionalInstructions = null, mediaIds = []) {
-  const res = await generateApi.generate(context, platforms, additionalInstructions)
+export async function generatePosts(context, platforms, additionalInstructions = null, mediaIds = [], length = 'medium') {
+  const res = await generateApi.generate(context, platforms, additionalInstructions, length)
   return res.data
 }
 

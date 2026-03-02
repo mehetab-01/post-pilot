@@ -95,6 +95,7 @@ export default function Dashboard() {
   const [additionalInstr, setAdditional] = useState('')
   const [mediaFiles, setMediaFiles]      = useState([])
   const [selectedPlatforms, setSelected] = useState({})
+  const [postLength, setPostLength]      = useState('medium')
   const [showApiWarning, setApiWarning]  = useState(false)
 
   // ── Generation state ──
@@ -225,6 +226,7 @@ export default function Dashboard() {
         platformsPayload,
         additionalInstr.trim() || null,
         mediaInfo.map((m) => m.id),
+        postLength,
       )
 
       const finalPosts = { ...loadingPosts }
@@ -328,8 +330,27 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Section 3: Generate button */}
+      {/* Section 3: Length toggle + Generate button */}
       <div ref={section3Ref} className="mb-10 opacity-0">
+        {/* Length toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-xs font-medium text-muted uppercase tracking-widest mr-1">Length</p>
+          {['short', 'medium', 'detailed'].map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setPostLength(opt)}
+              className={[
+                'px-3 py-1 rounded-lg text-xs font-medium border transition-all capitalize',
+                postLength === opt
+                  ? 'bg-amber/15 border-amber/40 text-amber'
+                  : 'border-border text-muted hover:text-text hover:bg-surface-2',
+              ].join(' ')}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
         <GenerateButton
           isLoading={isGenerating}
           isDisabled={!canGenerate}

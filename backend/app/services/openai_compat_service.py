@@ -46,9 +46,10 @@ async def generate_posts(
     platforms: dict,
     media_info: Optional[list] = None,
     additional_instructions: Optional[str] = None,
+    length: str = "medium",
 ) -> dict:
     client = _get_client(provider, api_key)
-    user_prompt = _build_generate_prompt(context, platforms, media_info, additional_instructions)
+    user_prompt = _build_generate_prompt(context, platforms, media_info, additional_instructions, length)
 
     resp = await client.chat.completions.create(
         model=model,

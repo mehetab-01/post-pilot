@@ -11,6 +11,7 @@ RULES:
 3. Match the exact tone requested for each platform
 4. Respect character limits strictly
 5. Use platform-native formatting
+6. STRUCTURE IS MANDATORY — never write a wall of text. Every post must have distinct sections separated by blank lines.
 
 PLATFORM GUIDELINES:
 
@@ -21,34 +22,41 @@ X/Twitter (max 280 chars per tweet):
 - If thread mode: tweet 1 = hook, middle tweets = value/story, last = CTA
 - Use line breaks between thoughts
 
-LinkedIn (sweet spot 1300 chars):
-- First line must be a scroll-stopping hook (this shows before "see more")
-- Single-line paragraphs with line breaks between them
-- Professional but genuinely human — no corporate buzzwords
-- Weave in personal story or specific insight
-- 3-5 hashtags at the very end
-- End with a question or call-to-action to drive comments
+LinkedIn — STRICT STRUCTURE REQUIRED:
+Every LinkedIn post MUST follow this exact structure with blank lines between each section:
+
+[HOOK LINE — single bold statement, max 12 words, no period]
+
+[1-2 lines of context or the problem/insight]
+
+[2-4 lines of the main value: story, lessons, steps, or data points — use "→" or numbered list if helpful]
+
+[1-2 lines of key takeaway or reflection]
+
+[CTA question to spark comments — start with "What do you think?" or similar]
+
+[3-5 hashtags on final line]
+
+Rules: NEVER write more than 2 sentences per paragraph. Use **bold** for key terms. Sweet spot: 800-1300 chars.
 
 Reddit (title + body):
 - Title: Specific, genuine, not clickbait
-- Body: Detailed, conversational, adds real value
+- Body: Detailed, conversational, adds real value. Use paragraph breaks.
 - NO hashtags, minimal emojis
 - Reddit hates obvious self-promotion — lead with value
 - Suggest 2-3 relevant subreddits
 
 Instagram (max 2200 chars):
 - Strong hook in first sentence (shows before "...more")
-- Storytelling or list format
+- Storytelling or list format with blank lines between sections
 - Natural emoji usage woven into text
-- Line breaks between paragraphs
 - Separate hashtag block at end: 20-30 relevant hashtags
 - End with CTA: "Save this for later" or "Share with someone"
 
 WhatsApp (short & personal):
-- 2-3 short paragraphs maximum
+- 2-3 short paragraphs maximum, blank line between each
 - Casual tone like texting a close friend
 - Relevant emojis sprinkled naturally
-- Link on its own line if included
 - No hashtags ever
 
 TONE DEFINITIONS:
@@ -106,16 +114,38 @@ RESPOND IN VALID JSON ONLY (no markdown, no backticks, just raw JSON):
 Only include platforms that were requested. Never include unrequested platforms."""
 
 
+_LENGTH_GUIDE = {
+    "short": (
+        "LENGTH: Keep posts SHORT and punchy. "
+        "Twitter: 1-2 sentences. LinkedIn: 300-500 chars, 3-4 sections max. "
+        "Reddit body: 2-3 paragraphs. Instagram: 3-4 lines + hashtags."
+    ),
+    "medium": (
+        "LENGTH: Use MEDIUM length — balanced and complete. "
+        "Twitter: 2-3 sentences. LinkedIn: 700-1000 chars, full structure. "
+        "Reddit body: 4-6 paragraphs. Instagram: 6-8 lines + hashtags."
+    ),
+    "detailed": (
+        "LENGTH: Write DETAILED and comprehensive posts. "
+        "Twitter: thread preferred, each tweet maxed. LinkedIn: 1100-1500 chars, rich structure with examples. "
+        "Reddit body: thorough, 6+ paragraphs with depth. Instagram: full caption near 2000 chars."
+    ),
+}
+
+
 def _build_generate_prompt(
     context: str,
     platforms: dict,
     media_info: Optional[list],
     additional_instructions: Optional[str],
+    length: str = "medium",
 ) -> str:
     lines = [
         "Generate social media posts for the following context:",
         "",
         f"CONTEXT:\n{context}",
+        "",
+        _LENGTH_GUIDE.get(length, _LENGTH_GUIDE["medium"]),
         "",
         "PLATFORMS TO GENERATE (respect the tone and options for each):",
     ]
@@ -146,11 +176,12 @@ async def generate_posts(
     platforms: dict,
     media_info: Optional[list] = None,
     additional_instructions: Optional[str] = None,
+    length: str = "medium",
     model: str = "claude-sonnet-4-20250514",
 ) -> dict:
     client = anthropic.AsyncAnthropic(api_key=api_key)
 
-    user_prompt = _build_generate_prompt(context, platforms, media_info, additional_instructions)
+    user_prompt = _build_generate_prompt(context, platforms, media_info, additional_instructions, length)
 
     message = await client.messages.create(
         model=model,

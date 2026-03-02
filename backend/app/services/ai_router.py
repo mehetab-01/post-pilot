@@ -31,6 +31,7 @@ async def generate_posts(
     platforms: dict,
     media_info: Optional[list] = None,
     additional_instructions: Optional[str] = None,
+    length: str = "medium",
 ) -> dict:
     providers = _get_providers(db, user_id)
     if not providers:
@@ -50,6 +51,7 @@ async def generate_posts(
                     platforms=platforms,
                     media_info=media_info,
                     additional_instructions=additional_instructions,
+                    length=length,
                 )
             else:
                 return await openai_compat_service.generate_posts(
@@ -60,6 +62,7 @@ async def generate_posts(
                     platforms=platforms,
                     media_info=media_info,
                     additional_instructions=additional_instructions,
+                    length=length,
                 )
         except Exception as exc:
             last_err = exc
