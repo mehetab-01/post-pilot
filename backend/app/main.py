@@ -61,9 +61,13 @@ if _DIST.exists():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
     @app.get("/favicon.ico", include_in_schema=False)
+    async def _favicon():
+        f = _DIST / "favicon.ico"
+        return FileResponse(f) if f.exists() else FileResponse(_DIST / "index.html")
+
     @app.get("/logo.png", include_in_schema=False)
-    async def _static_root(path: str = ""):
-        f = _DIST / path.lstrip("/")
+    async def _logo():
+        f = _DIST / "logo.png"
         return FileResponse(f) if f.exists() else FileResponse(_DIST / "index.html")
 
     # Catch-all: serve index.html for React Router paths

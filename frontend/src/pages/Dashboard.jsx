@@ -192,11 +192,13 @@ export default function Dashboard() {
     setIsGenerating(true)
 
     try {
-      const platformsPayload = selectedPlatformIds.map((p) => ({
-        platform: p,
-        tone: selectedPlatforms[p]?.tone ?? 'professional',
-        options: selectedPlatforms[p]?.options ?? {},
-      }))
+      const platformsPayload = {}
+      selectedPlatformIds.forEach((p) => {
+        platformsPayload[p] = {
+          tone: selectedPlatforms[p]?.tone ?? 'professional',
+          ...(selectedPlatforms[p]?.options ?? {}),
+        }
+      })
       const mediaInfo = mediaFiles
         .filter((f) => f.uploadedId)
         .map((f) => ({ id: f.uploadedId, name: f.name }))
@@ -209,7 +211,7 @@ export default function Dashboard() {
       )
 
       const finalPosts = { ...loadingPosts }
-      data.posts.forEach((post) => {
+      data.generated.forEach((post) => {
         finalPosts[post.platform] = {
           content: post.content, raw: post.raw ?? null, tone: post.tone,
           isLoading: false, isEdited: false, posted: false, post_url: null,
