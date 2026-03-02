@@ -2,6 +2,8 @@
 # LinkedIn API reference:
 #   https://learn.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/ugc-post-api
 
+import mimetypes
+import os
 import re
 from typing import Optional
 
@@ -80,10 +82,46 @@ def _get_profile_urn(access_token: str) -> tuple[str, str]:
     return urn, name
 
 
+def _upload_image(access_token: str, author_urn: str, file_path: str) -> str:
+    """Upload a local image to LinkedIn. Returns the asset URN."""
+    register_payload = {
+        "registerUploadRequest": {
+            "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+            "owner": author_urn,
+            "serviceRelationships": [{
+                "relationshipType": "OWNER",
+                "identifier": "urn:li:userGeneratedContent",
+            }],
+        }
+    }
+    with httpx.Client(timeout=30) as client:
+        reg = client.post(
+            f"{_BASE}/assets?action=registerUpload",
+            headers=_headers(access_token),
+            json=register_payload,
+        )
+        reg.raise_for_status()
+        val = reg.json()["value"]
+        upload_url = val["uploadMechanism"][
+            "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+        ]["uploadUrl"]
+        asset_urn = val["asset"]
+
+        content_type = mimetypes.guess_type(file_path)[0] or "image/jpeg"
+        with open(file_path, "rb") as f:
+            up = client.put(
+                upload_url,
+                content=f.read(),
+                headers={"Authorization": f"Bearer {access_token}", "Content-Type": content_type},
+            )
+            up.raise_for_status()
+    return asset_urn
+
+
 def post_to_linkedin(
     access_token: str,
     content: str,
-    media_urls: Optional[list[str]] = None,
+    media_paths: Optional[list[str]] = None,
 ) -> dict:
     author_urn, display_name = _get_profile_urn(access_token)
 
@@ -97,16 +135,20 @@ def post_to_linkedin(
         "shareMediaCategory": "NONE",
     }
 
-    if media_urls:
-        # Only image/article links are supported via UGC posts without uploading assets.
-        # For simplicity we attach the first URL as an article share.
-        share_content["shareMediaCategory"] = "ARTICLE"
-        share_content["media"] = [
-            {
-                "status": "READY",
-                "originalUrl": media_urls[0],
-            }
-        ]
+    if media_paths:
+        asset_urns = []
+        for path in media_paths:
+            if os.path.exists(path):
+                try:
+                    asset_urns.append(_upload_image(access_token, author_urn, path))
+                except Exception:
+                    pass  # skip failed uploads silently
+        if asset_urns:
+            share_content["shareMediaCategory"] = "IMAGE"
+            share_content["media"] = [
+                {"status": "READY", "media": urn, "description": {"text": ""}, "title": {"text": ""}}
+                for urn in asset_urns
+            ]
 
     payload = {
         "author": author_urn,

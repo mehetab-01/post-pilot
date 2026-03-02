@@ -345,6 +345,7 @@ export default function Dashboard() {
             selectedPlatforms={selectedPlatforms}
             context={context}
             connections={connections}
+            mediaIds={mediaFiles.filter(f => f.uploadedId).map(f => f.uploadedId)}
             onUpdate={handleUpdate}
             onPost={handleSinglePostResult}
           />

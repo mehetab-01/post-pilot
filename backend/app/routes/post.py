@@ -205,11 +205,10 @@ def _post_twitter(keys: dict, payload: PostToPlatformRequest, media_paths: list[
 
 def _post_linkedin(conn: SocialConnection, payload: PostToPlatformRequest, media_paths: list[str]) -> dict:
     access_token = decrypt_value(conn.access_token_enc)
-    media_urls = payload.options.get("media_urls", [])
     return linkedin_service.post_to_linkedin(
         access_token=access_token,
         content=payload.content,
-        media_urls=media_urls or None,
+        media_paths=media_paths or None,
     )
 
 

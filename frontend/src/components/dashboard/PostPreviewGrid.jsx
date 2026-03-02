@@ -59,6 +59,7 @@ export function PostPreviewGrid({
   selectedPlatforms,
   context,
   connections = {},
+  mediaIds = [],
   onUpdate,
   onPost,
 }) {
@@ -93,6 +94,7 @@ export function PostPreviewGrid({
                 context={context}
                 platformConfig={selectedPlatforms[platform]}
                 isConnected={connections[platform] ?? null}
+                mediaIds={mediaIds}
                 onUpdate={(patch) => onUpdate(platform, patch)}
                 onPost={(result) => onPost(platform, result)}
               />

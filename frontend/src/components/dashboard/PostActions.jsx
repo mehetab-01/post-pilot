@@ -41,6 +41,7 @@ export function PostActions({
   context,
   platformConfig,
   isConnected = null,
+  mediaIds = [],
   isEditing,
   onToggleEdit,
   onUpdate,
@@ -117,7 +118,7 @@ export function PostActions({
         ? { subreddit: options.subreddit ?? 'r/general', title: postData.raw?.title ?? postData.content.slice(0, 100), ...options }
         : options
 
-      const result = await postToPlatform(platform, postData.content, [], postOptions, postData.post_id)
+      const result = await postToPlatform(platform, postData.content, mediaIds, postOptions, postData.post_id)
       onUpdate({ posted: true, post_url: result.post_url })
       onPost({ platform, success: true, post_url: result.post_url })
       toast.success(`Posted to ${cfg?.label ?? platform}!`)
