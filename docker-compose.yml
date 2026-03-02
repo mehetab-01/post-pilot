@@ -1,0 +1,17 @@
+services:
+  postpilot:
+    build: .
+    container_name: postpilot
+    restart: unless-stopped
+    ports:
+      - "8100:8000"        # change 8100 to any free port on your laptop
+    volumes:
+      - postpilot_data:/app/data
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=sqlite:////app/data/postpilot.db
+      - UPLOAD_DIR=/app/data/uploads
+
+volumes:
+  postpilot_data:
