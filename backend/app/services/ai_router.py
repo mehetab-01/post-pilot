@@ -1,0 +1,134 @@
+"""
+AI provider fallback chain.
+
+Reads the user's AiProvider rows ordered by priority (ascending).
+Tries each enabled provider in turn; if one fails for any reason
+(bad key, rate-limit, network error), the next is tried automatically.
+Raises ValueError if every provider is exhausted.
+"""
+from typing import Optional
+
+from sqlalchemy.orm import Session
+
+from app.models.ai_provider import AiProvider
+from app.services.encryption import decrypt_value
+from app.services import claude_service, openai_compat_service
+
+
+def _get_providers(db: Session, user_id: int) -> list[AiProvider]:
+    return (
+        db.query(AiProvider)
+        .filter(AiProvider.user_id == user_id, AiProvider.enabled == True)  # noqa: E712
+        .order_by(AiProvider.priority)
+        .all()
+    )
+
+
+async def generate_posts(
+    db: Session,
+    user_id: int,
+    context: str,
+    platforms: dict,
+    media_info: Optional[list] = None,
+    additional_instructions: Optional[str] = None,
+) -> dict:
+    providers = _get_providers(db, user_id)
+    if not providers:
+        raise ValueError(
+            "No AI providers configured. Go to Settings and add at least one AI provider."
+        )
+
+    last_err: Exception = Exception("Unknown error")
+    for p in providers:
+        try:
+            key = decrypt_value(p.encrypted_key)
+            if p.provider == "claude":
+                return await claude_service.generate_posts(
+                    api_key=key,
+                    model=p.model,
+                    context=context,
+                    platforms=platforms,
+                    media_info=media_info,
+                    additional_instructions=additional_instructions,
+                )
+            else:
+                return await openai_compat_service.generate_posts(
+                    api_key=key,
+                    model=p.model,
+                    provider=p.provider,
+                    context=context,
+                    platforms=platforms,
+                    media_info=media_info,
+                    additional_instructions=additional_instructions,
+                )
+        except Exception as exc:
+            last_err = exc
+            continue
+
+    raise ValueError(
+        f"All AI providers failed. Last error: {last_err}"
+    )
+
+
+async def enhance_post(
+    db: Session,
+    user_id: int,
+    platform: str,
+    current_content: str,
+    tone: str,
+) -> str:
+    providers = _get_providers(db, user_id)
+    if not providers:
+        raise ValueError("No AI providers configured.")
+
+    last_err: Exception = Exception("Unknown error")
+    for p in providers:
+        try:
+            key = decrypt_value(p.encrypted_key)
+            if p.provider == "claude":
+                return await claude_service.enhance_post(
+                    api_key=key, model=p.model,
+                    platform=platform, current_content=current_content, tone=tone,
+                )
+            else:
+                return await openai_compat_service.enhance_post(
+                    api_key=key, model=p.model, provider=p.provider,
+                    platform=platform, current_content=current_content, tone=tone,
+                )
+        except Exception as exc:
+            last_err = exc
+            continue
+
+    raise ValueError(f"All AI providers failed. Last error: {last_err}")
+
+
+async def humanize_post(
+    db: Session,
+    user_id: int,
+    platform: str,
+    current_content: str,
+    tone: str,
+) -> str:
+    providers = _get_providers(db, user_id)
+    if not providers:
+        raise ValueError("No AI providers configured.")
+
+    last_err: Exception = Exception("Unknown error")
+    for p in providers:
+        try:
+            key = decrypt_value(p.encrypted_key)
+            if p.provider == "claude":
+                return await claude_service.humanize_post(
+                    api_key=key, model=p.model,
+                    platform=platform, current_content=current_content, tone=tone,
+                )
+            else:
+                return await openai_compat_service.humanize_post(
+                    api_key=key, model=p.model, provider=p.provider,
+                    platform=platform, current_content=current_content, tone=tone,
+                )
+        except Exception as exc:
+            last_err = exc
+            continue
+
+    raise ValueError(f"All AI providers failed. Last error: {last_err}")
