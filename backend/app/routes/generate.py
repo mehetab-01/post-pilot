@@ -17,6 +17,7 @@ from app.schemas.schemas import (
     RegenerateRequest,
     RegenerateResponse,
 )
+from app.plans import check_generation_limit, check_platform_limit, check_tone_allowed, increment_generation, require_plan
 from app.security import get_current_user
 from app.services import ai_router
 
@@ -45,6 +46,11 @@ async def generate(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one platform must be specified.",
         )
+
+    # ── Plan gating ───────────────────────────────────────────────────────
+    check_generation_limit(current_user, db)
+    check_platform_limit(current_user, payload.platforms)
+    check_tone_allowed(current_user, payload.platforms)
 
     try:
         result = await ai_router.generate_posts(
@@ -95,6 +101,9 @@ async def generate(
 
     db.commit()
 
+    # Track usage
+    increment_generation(current_user, db, count=len(generated))
+
     return GenerateResponse(generated=generated, posting_tips=posting_tips)
 
 
@@ -105,6 +114,10 @@ async def regenerate(
     current_user: User = Depends(get_current_user),
 ):
     platform_options = {"tone": payload.tone, **payload.options}
+
+    # ── Plan gating ───────────────────────────────────────────────────────
+    check_generation_limit(current_user, db)
+    check_tone_allowed(current_user, {payload.platform: platform_options})
 
     try:
         result = await ai_router.generate_posts(
@@ -143,6 +156,9 @@ async def regenerate(
     db.commit()
     db.refresh(post)
 
+    # Track usage
+    increment_generation(current_user, db)
+
     return RegenerateResponse(
         post_id=post.id,
         platform=payload.platform,
@@ -165,6 +181,7 @@ async def enhance(
             platform=payload.platform,
             current_content=payload.content,
             tone=payload.tone,
+            additional_instructions=payload.additional_instructions,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -187,6 +204,8 @@ async def humanize(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_plan(current_user, "starter", "AI Humanizer")
+
     try:
         humanized = await ai_router.humanize_post(
             db=db,
