@@ -70,14 +70,14 @@ export const settingsApi = {
 
 // ── Generate ──────────────────────────────────────────────────────────────────
 export const generateApi = {
-  generate: (context, platforms, additional_instructions, length = 'medium') =>
-    api.post('/api/generate', { context, platforms, additional_instructions, length }),
+  generate: (context, platforms, additional_instructions) =>
+    api.post('/api/generate', { context, platforms, additional_instructions }),
 
   regenerate: (platform, context, tone, options) =>
     api.post('/api/generate/regenerate', { platform, context, tone, options }),
 
-  enhance: (platform, content, tone) =>
-    api.post('/api/generate/enhance', { platform, content, tone }),
+  enhance: (platform, content, tone, additional_instructions = null) =>
+    api.post('/api/generate/enhance', { platform, content, tone, additional_instructions }),
 
   humanize: (platform, content, tone) =>
     api.post('/api/generate/humanize', { platform, content, tone }),
@@ -114,6 +114,32 @@ export const mediaApi = {
   getUrl: (id) => `/api/media/${id}`,
 
   delete: (id) => api.delete(`/api/media/${id}`),
+}
+
+// ── Analyze ───────────────────────────────────────────────────────────────────
+export const analyzeApi = {
+  humanizeScore: (content, platform) =>
+    api.post('/api/analyze/humanize-score', { content, platform }),
+
+  originalityCheck: (content, platform) =>
+    api.post('/api/analyze/originality-check', { content, platform }),
+}
+
+// ── Templates ─────────────────────────────────────────────────────────────────
+export const templatesApi = {
+  list: (category) =>
+    api.get('/api/templates', { params: category && category !== 'all' ? { category } : {} }),
+  get: (id) => api.get(`/api/templates/${id}`),
+  create: (data) => api.post('/api/templates', data),
+  update: (id, data) => api.put(`/api/templates/${id}`, data),
+  delete: (id) => api.delete(`/api/templates/${id}`),
+  use: (id) => api.post(`/api/templates/${id}/use`),
+}
+
+// ── Usage / Plans ─────────────────────────────────────────────────────────────
+export const usageApi = {
+  getUsage: () => api.get('/api/usage'),
+  upgrade: (plan) => api.post('/api/upgrade', { plan }),
 }
 
 export default api

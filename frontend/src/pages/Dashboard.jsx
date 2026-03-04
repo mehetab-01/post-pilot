@@ -12,10 +12,14 @@ import { GenerateButton } from '@/components/dashboard/GenerateButton'
 import { PostPreviewGrid } from '@/components/dashboard/PostPreviewGrid'
 import { PublishBar } from '@/components/dashboard/PublishBar'
 import { PublishModal } from '@/components/dashboard/PublishModal'
+import { TemplateRow } from '@/components/dashboard/TemplateRow'
+import { SaveTemplateModal } from '@/components/dashboard/SaveTemplateModal'
+import { UpgradeModal } from '@/components/dashboard/UpgradeModal'
 import { generatePosts, postToPlatform } from '@/services/generate'
+import { getHumanizeScore, getOriginalityScore } from '@/services/analyze'
 import { getConnections } from '@/services/oauth'
-import { settingsApi } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUsage } from '@/contexts/UsageContext'
 
 // ── API key warning banner ─────────────────────────────────────────────────────
 function ApiKeyWarning({ onDismiss }) {
@@ -81,6 +85,12 @@ function SectionLabel({ children }) {
 export default function Dashboard() {
   const { user } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
+  const {
+    limitReached, isFree, fetchUsage,
+    canHumanize, canOriginality, canDirectPost,
+    isToneLocked, isPlatformLocked,
+  } = useUsage()
 
   // Pre-fill context when arriving from History "Reuse as template"
   const prefillContext = location.state?.context ?? ''
@@ -95,7 +105,6 @@ export default function Dashboard() {
   const [additionalInstr, setAdditional] = useState('')
   const [mediaFiles, setMediaFiles]      = useState([])
   const [selectedPlatforms, setSelected] = useState({})
-  const [postLength, setPostLength]      = useState('medium')
   const [showApiWarning, setApiWarning]  = useState(false)
 
   // ── Generation state ──
@@ -105,16 +114,33 @@ export default function Dashboard() {
   // ── Connections state ──
   const [connections, setConnections] = useState({})
 
+  // ── Humanize scores ──
+  const [humanizeScores, setHumanizeScores] = useState({})
+  // Track last content scored per platform to skip duplicate API calls
+  const scoredContentRef = useRef({})
+
+  // ── Originality scores ──
+  const [originalityScores, setOriginalityScores] = useState({})
+  const originalityScoredRef = useRef({})
+
   // ── Publish state ──
   const [showPublishModal, setShowPublish] = useState(false)
   const [isPublishing, setIsPublishing]   = useState(false)
   const [publishResults, setPublishResults] = useState({})
 
+  // ── Template state ──
+  const [showSaveModal, setShowSaveModal] = useState(false)
+
+  // ── Upgrade modal state ──
+  const [upgradeModal, setUpgradeModal] = useState({ open: false, feature: '' })
+  const showUpgrade = (feature) => setUpgradeModal({ open: true, feature })
+  const closeUpgrade = () => setUpgradeModal({ open: false, feature: '' })
+
   // ── Derived ──
   const selectedPlatformIds = Object.keys(selectedPlatforms).filter(
     (p) => !!selectedPlatforms[p],
   )
-  const canGenerate       = context.trim().length > 0 && selectedPlatformIds.length > 0
+  const canGenerate       = context.trim().length > 0 && selectedPlatformIds.length > 0 && !limitReached
   const hasGeneratedPosts = Object.keys(generatedPosts).length > 0
 
   // Page title
@@ -122,12 +148,11 @@ export default function Dashboard() {
 
   // Fetch OAuth connections + Twitter keys on mount
   useEffect(() => {
-    Promise.all([getConnections(), settingsApi.getKeys()]).then(([oauthConns, keysRes]) => {
-      const twitterKeys = keysRes.data?.find?.(p => p.platform === 'twitter')?.keys ?? []
+    getConnections().then((oauthConns) => {
       setConnections({
         linkedin: oauthConns.linkedin?.connected ?? false,
         reddit: oauthConns.reddit?.connected ?? false,
-        twitter: twitterKeys.length > 0,
+        twitter: oauthConns.twitter?.connected ?? false,
       })
     }).catch(() => {})
   }, [])
@@ -141,6 +166,35 @@ export default function Dashboard() {
       { opacity: 1, y: 0, duration: 0.5, stagger: 0.1, ease: 'power2.out', delay: 0.15 },
     )
   }, [])
+
+  // Pre-fill from template (navigated from Templates page via location.state.template)
+  useEffect(() => {
+    const tpl = location.state?.template
+    if (!tpl) return
+    applyTemplate(tpl)
+    // Clear state so back-navigation doesn't re-apply
+    navigate(location.pathname, { replace: true, state: {} })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyTemplate(tpl) {
+    setContext(tpl.context_template ?? '')
+    if (tpl.platforms?.length) {
+      const newSelected = {}
+      tpl.platforms.forEach((p) => {
+        newSelected[p] = {
+          tone: tpl.tones?.[p] ?? 'professional',
+          options: {},
+        }
+      })
+      setSelected(newSelected)
+    }
+    // Scroll to context input
+    setTimeout(() => section1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
+  }
+
+  const handleSelectTemplate = useCallback((tpl) => {
+    applyTemplate(tpl)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -170,32 +224,114 @@ export default function Dashboard() {
         delete next[platformId]
         return next
       }
-      return { ...prev, [platformId]: { tone: 'professional', options: {} } }
+      // Check free-plan platform limit (max 3)
+      const currentCount = Object.keys(prev).filter(k => prev[k]).length
+      if (isPlatformLocked(currentCount)) {
+        showUpgrade('All Platforms')
+        return prev
+      }
+      return { ...prev, [platformId]: { tone: 'professional', options: {}, length: 'medium' } }
     })
-  }, [])
+  }, [isPlatformLocked])
 
   const handleToneChange = useCallback((platformId, tone) => {
+    if (isToneLocked(tone)) {
+      showUpgrade(`${tone.charAt(0).toUpperCase() + tone.slice(1)} Tone`)
+      return
+    }
     setSelected((prev) => ({
       ...prev,
       [platformId]: { ...prev[platformId], tone },
     }))
-  }, [])
+  }, [isToneLocked])
 
-  const handleOptionChange = useCallback((platformId, key, value) => {
+  const handleOptionChange = useCallback((platformId, newOptions) => {
     setSelected((prev) => ({
       ...prev,
       [platformId]: {
         ...prev[platformId],
-        options: { ...prev[platformId]?.options, [key]: value },
+        options: newOptions,
       },
+    }))
+  }, [])
+
+  const handleLengthChange = useCallback((platformId, length) => {
+    setSelected((prev) => ({
+      ...prev,
+      [platformId]: { ...prev[platformId], length },
     }))
   }, [])
 
   // ────────────────────────────────────────────────────────────────────────────
   // Generate
+  // ── Score helpers ─────────────────────────────────────────────────────────────
+  function scorePost(platform, content) {
+    // Skip if plan doesn't include humanizer
+    if (!canHumanize) return
+    // Skip if the same content was already scored for this platform
+    if (scoredContentRef.current[platform] === content) return
+
+    scoredContentRef.current[platform] = content
+    setHumanizeScores((prev) => ({
+      ...prev,
+      [platform]: { loading: true, data: prev[platform]?.data ?? null },
+    }))
+    getHumanizeScore(content, platform)
+      .then((data) => {
+        setHumanizeScores((prev) => ({
+          ...prev,
+          [platform]: { loading: false, data },
+        }))
+      })
+      .catch(() => {
+        // Fail silently — scoring is a non-critical background task
+        scoredContentRef.current[platform] = null  // allow retry
+        setHumanizeScores((prev) => ({
+          ...prev,
+          [platform]: { loading: false, data: prev[platform]?.data ?? null },
+        }))
+      })
+  }
+
+  function scoreOriginality(platform, content) {
+    // Skip if plan doesn't include originality
+    if (!canOriginality) return
+    if (originalityScoredRef.current[platform] === content) return
+
+    originalityScoredRef.current[platform] = content
+    setOriginalityScores((prev) => ({
+      ...prev,
+      [platform]: { loading: true, data: prev[platform]?.data ?? null },
+    }))
+    getOriginalityScore(content, platform)
+      .then((data) => {
+        setOriginalityScores((prev) => ({
+          ...prev,
+          [platform]: { loading: false, data },
+        }))
+      })
+      .catch(() => {
+        originalityScoredRef.current[platform] = null
+        setOriginalityScores((prev) => ({
+          ...prev,
+          [platform]: { loading: false, data: prev[platform]?.data ?? null },
+        }))
+      })
+  }
+
+  function handleRescoreNeeded(platform, content) {
+    scorePost(platform, content)
+    scoreOriginality(platform, content)
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   async function handleGenerate() {
     if (!canGenerate || isGenerating) return
+
+    if (limitReached) {
+      showUpgrade('More Generations')
+      return
+    }
 
     const loadingPosts = {}
     selectedPlatformIds.forEach((p) => {
@@ -207,6 +343,10 @@ export default function Dashboard() {
     })
     setGenerated(loadingPosts)
     setPublishResults({})
+    setHumanizeScores({})
+    scoredContentRef.current = {}
+    setOriginalityScores({})
+    originalityScoredRef.current = {}
     setIsGenerating(true)
 
     try {
@@ -214,6 +354,7 @@ export default function Dashboard() {
       selectedPlatformIds.forEach((p) => {
         platformsPayload[p] = {
           tone: selectedPlatforms[p]?.tone ?? 'professional',
+          length: selectedPlatforms[p]?.length ?? 'medium',
           ...(selectedPlatforms[p]?.options ?? {}),
         }
       })
@@ -226,7 +367,6 @@ export default function Dashboard() {
         platformsPayload,
         additionalInstr.trim() || null,
         mediaInfo.map((m) => m.id),
-        postLength,
       )
 
       const finalPosts = { ...loadingPosts }
@@ -237,12 +377,36 @@ export default function Dashboard() {
         }
       })
       setGenerated(finalPosts)
+
+      // Auto-score each post in background (non-blocking)
+      setHumanizeScores({})
+      data.generated.forEach((post) => {
+        scorePost(post.platform, post.content)
+        scoreOriginality(post.platform, post.content)
+      })
+
+      // Refresh usage counters
+      fetchUsage()
     } catch (err) {
       const detail = err?.response?.data?.detail ?? ''
-      if (detail.toLowerCase().includes('api key') || err?.response?.status === 401) {
+      // Handle plan limit errors from backend (403)
+      const detailObj = typeof detail === 'object' ? detail : {}
+      if (err?.response?.status === 403 && detailObj.error) {
+        const msg = detailObj.error === 'limit_reached'
+          ? 'Generation limit reached'
+          : detailObj.error === 'platform_limit'
+          ? 'Platform limit reached'
+          : detailObj.error === 'tone_locked'
+          ? `${detailObj.locked_tone} tone`
+          : 'This feature'
+        showUpgrade(msg)
+        setGenerated({})
+        return
+      }
+      if ((typeof detail === 'string' && detail.toLowerCase().includes('api key')) || err?.response?.status === 401) {
         setApiWarning(true)
       }
-      toast.error(detail || 'Generation failed. Check your Claude API key in Settings.')
+      toast.error((typeof detail === 'string' ? detail : detail?.message) || 'Generation failed. Check your Claude API key in Settings.')
       setGenerated({})
     } finally {
       setIsGenerating(false)
@@ -307,6 +471,9 @@ export default function Dashboard() {
 
       {showApiWarning && <ApiKeyWarning onDismiss={() => setApiWarning(false)} />}
 
+      {/* Templates row */}
+      <TemplateRow onSelectTemplate={handleSelectTemplate} />
+
       {/* Section 1: Context */}
       <div ref={section1Ref} className="mb-8 opacity-0">
         <SectionLabel>What do you want to post about?</SectionLabel>
@@ -327,34 +494,21 @@ export default function Dashboard() {
           onToggle={handleToggle}
           onToneChange={handleToneChange}
           onOptionChange={handleOptionChange}
+          onLengthChange={handleLengthChange}
+          isToneLocked={isToneLocked}
+          isPlatformLocked={isPlatformLocked}
+          selectedCount={selectedPlatformIds.length}
         />
       </div>
 
-      {/* Section 3: Length toggle + Generate button */}
+      {/* Section 3: Generate button */}
       <div ref={section3Ref} className="mb-10 opacity-0">
-        {/* Length toggle */}
-        <div className="flex items-center gap-2 mb-4">
-          <p className="text-xs font-medium text-muted uppercase tracking-widest mr-1">Length</p>
-          {['short', 'medium', 'detailed'].map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => setPostLength(opt)}
-              className={[
-                'px-3 py-1 rounded-lg text-xs font-medium border transition-all capitalize',
-                postLength === opt
-                  ? 'bg-amber/15 border-amber/40 text-amber'
-                  : 'border-border text-muted hover:text-text hover:bg-surface-2',
-              ].join(' ')}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
         <GenerateButton
           isLoading={isGenerating}
           isDisabled={!canGenerate}
           onClick={handleGenerate}
+          limitReached={limitReached}
+          onUpgrade={() => showUpgrade('More Generations')}
         />
       </div>
 
@@ -367,8 +521,16 @@ export default function Dashboard() {
             context={context}
             connections={connections}
             mediaIds={mediaFiles.filter(f => f.uploadedId).map(f => f.uploadedId)}
+            humanizeScores={humanizeScores}
+            originalityScores={originalityScores}
             onUpdate={handleUpdate}
             onPost={handleSinglePostResult}
+            onRescoreNeeded={handleRescoreNeeded}
+            onSaveTemplate={() => setShowSaveModal(true)}
+            canDirectPost={canDirectPost}
+            canHumanize={canHumanize}
+            canOriginality={canOriginality}
+            onUpgrade={showUpgrade}
           />
         </div>
       )}
@@ -391,6 +553,20 @@ export default function Dashboard() {
         publishResults={publishResults}
         onPublishAll={handlePublishAll}
         isPublishing={isPublishing}
+      />
+
+      {/* Save as Template modal */}
+      <SaveTemplateModal
+        open={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        context={context}
+      />
+
+      {/* Upgrade modal */}
+      <UpgradeModal
+        isOpen={upgradeModal.open}
+        onClose={closeUpgrade}
+        feature={upgradeModal.feature}
       />
     </PageTransition>
   )

@@ -1,9 +1,13 @@
 import { useState, useRef } from 'react'
 import { clsx } from 'clsx'
 import { ExternalLink } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { PLATFORM_MAP, TONE_MAP } from './constants'
 import { PostActions } from './PostActions'
+import { HumanizeScore } from './HumanizeScore'
+import { OriginalityScore } from './OriginalityScore'
 import { Badge } from '@/components/ui/Badge'
+import { humanizePost } from '@/services/generate'
 
 // ── Char count indicator ──────────────────────────────────────────────────────
 function CharCount({ count, limit }) {
@@ -121,7 +125,7 @@ function PlatformContent({ platform, raw, content }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function PostPreview({ platform, postData, context, platformConfig, isConnected = null, mediaIds = [], onUpdate, onPost }) {
+export function PostPreview({ platform, postData, context, platformConfig, isConnected = null, mediaIds = [], scoreData, scoreLoading, originalityData, originalityLoading, onUpdate, onPost, onRescoreNeeded, canDirectPost, canHumanize, canOriginality, onUpgrade }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const textareaRef = useRef(null)
@@ -130,6 +134,15 @@ export function PostPreview({ platform, postData, context, platformConfig, isCon
   const toneData  = TONE_MAP[postData?.tone ?? 'professional']
   const ToneIcon  = toneData?.Icon
   const PlatIcon  = cfg?.Icon
+
+  async function handleHumanizeFromBadge() {
+    if (!canHumanize) { onUpgrade?.('AI Humanizer'); return }
+    const tone = platformConfig?.tone ?? 'professional'
+    const result = await humanizePost(platform, postData.content, tone)
+    onUpdate({ content: result.humanized_content, isEdited: true })
+    onRescoreNeeded?.(result.humanized_content)
+    toast.success('Humanized')
+  }
 
   function startEdit() {
     setEditValue(postData.content)
@@ -177,6 +190,24 @@ export function PostPreview({ platform, postData, context, platformConfig, isCon
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Content Quality bar: Human score + Originality score */}
+          {!postData.isLoading && (
+            <div className="flex items-center gap-1.5">
+              <HumanizeScore
+                scoreData={canHumanize ? scoreData : null}
+                loading={canHumanize ? scoreLoading : false}
+                onHumanize={handleHumanizeFromBadge}
+                locked={!canHumanize}
+                onUpgrade={() => onUpgrade?.('AI Humanizer')}
+              />
+              <OriginalityScore
+                scoreData={canOriginality ? originalityData : null}
+                loading={canOriginality ? originalityLoading : false}
+                locked={!canOriginality}
+                onUpgrade={() => onUpgrade?.('Originality Check')}
+              />
+            </div>
+          )}
           {/* Tone badge */}
           {ToneIcon && (
             <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md text-xs text-muted border border-border bg-zinc-900">
@@ -235,6 +266,9 @@ export function PostPreview({ platform, postData, context, platformConfig, isCon
           onToggleEdit={handleToggleEdit}
           onUpdate={onUpdate}
           onPost={onPost}
+          onRescoreNeeded={onRescoreNeeded}
+          canDirectPost={canDirectPost}
+          onUpgrade={onUpgrade}
         />
       </div>
     </div>

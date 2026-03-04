@@ -1,11 +1,11 @@
 import { useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Bookmark } from 'lucide-react'
 import { PostPreview } from './PostPreview'
 
 // ── Ready heading ──────────────────────────────────────────────────────────────
-function ReadyHeading({ show }) {
+function ReadyHeading({ show, onSaveTemplate }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -28,6 +28,16 @@ function ReadyHeading({ show }) {
         Your posts are ready
       </h2>
       <div className="flex-1 h-px bg-border ml-1" />
+      {onSaveTemplate && (
+        <button
+          type="button"
+          onClick={onSaveTemplate}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-muted border border-border hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all duration-150 flex-shrink-0"
+        >
+          <Bookmark size={11} />
+          Save as Template
+        </button>
+      )}
     </div>
   )
 }
@@ -60,8 +70,16 @@ export function PostPreviewGrid({
   context,
   connections = {},
   mediaIds = [],
+  humanizeScores = {},
+  originalityScores = {},
   onUpdate,
   onPost,
+  onRescoreNeeded,
+  onSaveTemplate,
+  canDirectPost,
+  canHumanize,
+  canOriginality,
+  onUpgrade,
 }) {
   // selectedPlatforms: { twitter: { tone, options }, ... }
   const platforms = Object.keys(generatedPosts)
@@ -74,7 +92,7 @@ export function PostPreviewGrid({
 
   return (
     <section>
-      <ReadyHeading show={hasAny} />
+      <ReadyHeading show={hasAny} onSaveTemplate={onSaveTemplate} />
 
       <div className="flex flex-col gap-5">
         <AnimatePresence mode="popLayout">
@@ -95,8 +113,17 @@ export function PostPreviewGrid({
                 platformConfig={selectedPlatforms[platform]}
                 isConnected={connections[platform] ?? null}
                 mediaIds={mediaIds}
+                scoreData={humanizeScores[platform]?.data ?? null}
+                scoreLoading={humanizeScores[platform]?.loading ?? false}
+                originalityData={originalityScores[platform]?.data ?? null}
+                originalityLoading={originalityScores[platform]?.loading ?? false}
                 onUpdate={(patch) => onUpdate(platform, patch)}
                 onPost={(result) => onPost(platform, result)}
+                onRescoreNeeded={(content) => onRescoreNeeded?.(platform, content)}
+                canDirectPost={canDirectPost}
+                canHumanize={canHumanize}
+                canOriginality={canOriginality}
+                onUpgrade={onUpgrade}
               />
             </motion.div>
           ))}
