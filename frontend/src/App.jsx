@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion'
 import Lenis from 'lenis'
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { UsageProvider } from '@/contexts/UsageContext'
 import { Layout } from '@/components/layout/Layout'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
@@ -17,6 +18,7 @@ import Landing  from '@/pages/Landing'
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const History   = lazy(() => import('@/pages/History'))
 const Settings  = lazy(() => import('@/pages/Settings'))
+const Templates = lazy(() => import('@/pages/Templates'))
 
 // ── Lenis smooth scroll ───────────────────────────────────────────────────────
 function LenisProvider() {
@@ -67,6 +69,7 @@ function AnimatedRoutes() {
       <Routes location={location} key={location.pathname}>
         {/* Public pages */}
         <Route path="/"         element={<PublicRoute><Landing /></PublicRoute>} />
+        <Route path="/pricing"  element={<PublicRoute><Landing /></PublicRoute>} />
         <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
@@ -107,6 +110,18 @@ function AnimatedRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/templates"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Suspense fallback={<PageFallback />}>
+                  <Templates />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
@@ -118,6 +133,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <UsageProvider>
         <LenisProvider />
         <AnimatedRoutes />
         <Toaster
@@ -134,10 +150,11 @@ export default function App() {
               padding: '12px 16px',
               boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
             },
-            success: { iconTheme: { primary: '#f59e0b', secondary: '#27272a' } },
+            success: { iconTheme: { primary: '#8b5cf6', secondary: '#27272a' } },
             error:   { iconTheme: { primary: '#f87171', secondary: '#27272a' } },
           }}
         />
+      </UsageProvider>
       </AuthProvider>
     </BrowserRouter>
   )
