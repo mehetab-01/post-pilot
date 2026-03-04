@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '@/contexts/AuthContext'
 import { motion, useInView } from 'framer-motion'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -501,6 +502,7 @@ function TrustBadge({ icon: Icon, text }) {
 export default function Landing() {
   const [billing, setBilling] = useState('monthly')
   const location = useLocation()
+  const { isAuthenticated } = useAuth()
 
   // Refs
   const orb1 = useRef(null)
@@ -639,22 +641,37 @@ export default function Landing() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link
-            to="/login"
-            className="hidden sm:block text-sm text-muted hover:text-text transition-colors px-4 py-2 rounded-lg hover:bg-white/[0.04]"
-          >
-            Login
-          </Link>
-          <Link
-            to="/register"
-            className="text-sm font-semibold text-white px-4 py-2 rounded-lg transition-all hover:brightness-110 active:scale-[0.97]"
-            style={{
-              background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
-              boxShadow: '0 0 14px rgba(139,92,246,0.35)',
-            }}
-          >
-            Sign Up
-          </Link>
+          {isAuthenticated ? (
+            <Link
+              to="/dashboard"
+              className="text-sm font-semibold text-white px-4 py-2 rounded-lg transition-all hover:brightness-110 active:scale-[0.97]"
+              style={{
+                background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
+                boxShadow: '0 0 14px rgba(139,92,246,0.35)',
+              }}
+            >
+              Go to Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="hidden sm:block text-sm text-muted hover:text-text transition-colors px-4 py-2 rounded-lg hover:bg-white/[0.04]"
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className="text-sm font-semibold text-white px-4 py-2 rounded-lg transition-all hover:brightness-110 active:scale-[0.97]"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
+                  boxShadow: '0 0 14px rgba(139,92,246,0.35)',
+                }}
+              >
+                Sign Up
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -780,14 +797,14 @@ export default function Landing() {
           className="flex flex-wrap items-center justify-center gap-3 mb-16"
         >
           <Link
-            to="/register"
+            to={isAuthenticated ? '/dashboard' : '/register'}
             className="flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold text-white text-sm transition-all hover:brightness-110 hover:scale-[1.03] active:scale-[0.97]"
             style={{
               background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
               boxShadow: '0 0 28px rgba(139,92,246,0.45)',
             }}
           >
-            Start for Free
+            {isAuthenticated ? 'Go to Dashboard' : 'Start for Free'}
             <ArrowRight size={15} />
           </Link>
           <button
@@ -1147,19 +1164,21 @@ export default function Landing() {
               lifting while you focus on what actually matters.
             </p>
             <Link
-              to="/register"
+              to={isAuthenticated ? '/dashboard' : '/register'}
               className="inline-flex items-center gap-2.5 px-9 py-4 rounded-xl font-semibold text-white text-base transition-all hover:brightness-110 hover:scale-[1.03] active:scale-[0.97]"
               style={{
                 background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
                 boxShadow: '0 0 40px rgba(139,92,246,0.5)',
               }}
             >
-              Start for Free
+              {isAuthenticated ? 'Go to Dashboard' : 'Start for Free'}
               <ArrowRight size={17} />
             </Link>
-            <p className="text-muted text-xs mt-5">
-              No credit card required &middot; Takes 30 seconds
-            </p>
+            {!isAuthenticated && (
+              <p className="text-muted text-xs mt-5">
+                No credit card required &middot; Takes 30 seconds
+              </p>
+            )}
           </motion.div>
         </div>
       </section>
@@ -1210,18 +1229,14 @@ export default function Landing() {
               >
                 Pricing
               </button>
-              <Link
-                to="/login"
-                className="hover:text-text transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                to="/register"
-                className="hover:text-text transition-colors"
-              >
-                Sign Up
-              </Link>
+              {isAuthenticated ? (
+                <Link to="/dashboard" className="hover:text-text transition-colors">Dashboard</Link>
+              ) : (
+                <>
+                  <Link to="/login" className="hover:text-text transition-colors">Login</Link>
+                  <Link to="/register" className="hover:text-text transition-colors">Sign Up</Link>
+                </>
+              )}
             </div>
 
             {/* Social links */}
@@ -1245,6 +1260,14 @@ export default function Landing() {
                 <FaLinkedin size={16} />
               </a>
             </div>
+          </div>
+
+          {/* Legal links */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-8 text-sm text-muted">
+            <Link to="/privacy" className="hover:text-text transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-text transition-colors">Terms of Service</Link>
+            <Link to="/cookies" className="hover:text-text transition-colors">Cookie Policy</Link>
+            <Link to="/acceptable-use" className="hover:text-text transition-colors">Acceptable Use</Link>
           </div>
 
           {/* Divider */}

@@ -20,6 +20,12 @@ const History   = lazy(() => import('@/pages/History'))
 const Settings  = lazy(() => import('@/pages/Settings'))
 const Templates = lazy(() => import('@/pages/Templates'))
 
+// Legal pages — lazy-loaded (filenames avoid ad-blocker keyword triggers)
+const PrivacyPolicy       = lazy(() => import('@/pages/legal/DataPolicy'))
+const TermsOfService      = lazy(() => import('@/pages/legal/ServiceTerms'))
+const CookiePolicy        = lazy(() => import('@/pages/legal/SiteTracking'))
+const AcceptableUsePolicy = lazy(() => import('@/pages/legal/UsageRules'))
+
 // ── Lenis smooth scroll ───────────────────────────────────────────────────────
 function LenisProvider() {
   useEffect(() => {
@@ -54,8 +60,8 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 
-// Public routes redirect authenticated users to the dashboard
-function PublicRoute({ children }) {
+// Public routes redirect authenticated users to the dashboard (login/register only)
+function AuthRoute({ children }) {
   const { isAuthenticated, isLoading } = useAuth()
   if (isLoading) return <PageFallback />
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : children
@@ -67,11 +73,16 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        {/* Public pages */}
-        <Route path="/"         element={<PublicRoute><Landing /></PublicRoute>} />
-        <Route path="/pricing"  element={<PublicRoute><Landing /></PublicRoute>} />
-        <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        {/* Public pages — accessible to everyone including logged-in users */}
+        <Route path="/"         element={<Landing />} />
+        <Route path="/pricing"  element={<Landing />} />
+        <Route path="/privacy"  element={<Suspense fallback={<PageFallback />}><PrivacyPolicy /></Suspense>} />
+        <Route path="/terms"    element={<Suspense fallback={<PageFallback />}><TermsOfService /></Suspense>} />
+        <Route path="/cookies"  element={<Suspense fallback={<PageFallback />}><CookiePolicy /></Suspense>} />
+        <Route path="/acceptable-use" element={<Suspense fallback={<PageFallback />}><AcceptableUsePolicy /></Suspense>} />
+        {/* Auth pages — redirect if already logged in */}
+        <Route path="/login"    element={<AuthRoute><Login /></AuthRoute>} />
+        <Route path="/register" element={<AuthRoute><Register /></AuthRoute>} />
 
         {/* Protected app pages */}
         <Route
