@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { LayoutTemplate, ArrowRight, Lock, Sparkles, Star } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
@@ -62,15 +61,12 @@ function TemplateCard({ template, plan, onClick, onPreview }) {
   }
 
   return (
-    <motion.button
+    <button
       type="button"
       onClick={handleClick}
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.15 }}
-      className="flex-shrink-0 w-44 rounded-xl border text-left p-3 transition-all duration-150 cursor-pointer relative overflow-hidden"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex-shrink-0 w-44 rounded-xl border text-left p-3 cursor-pointer relative overflow-hidden"
       style={{
         background: locked
           ? 'rgba(255,255,255,0.015)'
@@ -78,8 +74,12 @@ function TemplateCard({ template, plan, onClick, onPreview }) {
         borderColor: locked
           ? 'rgba(30,30,46,0.7)'
           : hovered ? 'rgba(139,92,246,0.35)' : 'rgba(30,30,46,1)',
-        boxShadow: (!locked && hovered) ? '0 0 0 1px rgba(139,92,246,0.2)' : 'none',
+        boxShadow: (!locked && hovered)
+          ? '0 4px 16px rgba(139,92,246,0.12), 0 0 0 1px rgba(139,92,246,0.2)'
+          : 'none',
         opacity: locked ? 0.7 : 1,
+        transform: (!locked && hovered) ? 'translateY(-2px)' : 'translateY(0)',
+        transition: 'all 0.2s ease',
       }}
     >
       {/* Top row: category badge + tier badge */}
@@ -144,7 +144,7 @@ function TemplateCard({ template, plan, onClick, onPreview }) {
           <Lock size={10} className="text-muted/60" />
         </div>
       )}
-    </motion.button>
+    </button>
   )
 }
 
@@ -184,7 +184,7 @@ export function TemplateRow({ onSelectTemplate, onUpgrade }) {
 
       {/* Scroll row */}
       <div
-        className="flex gap-2.5 overflow-x-auto pb-1"
+        className="flex gap-2.5 overflow-x-auto py-1"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {loading

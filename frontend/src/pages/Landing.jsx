@@ -14,6 +14,8 @@ import {
   FaWhatsapp, FaMastodon,
 } from 'react-icons/fa'
 import { SiBluesky } from 'react-icons/si'
+import toast from 'react-hot-toast'
+import { openRazorpayCheckout } from '@/services/billing'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -369,7 +371,17 @@ function FeatureCard({ icon: Icon, title, description, gradient, delay = 0 }) {
 }
 
 // ─── Pricing card ───────────────────────────────────────────────────────────
-function PricingCard({ plan, index }) {
+function PricingCard({ plan, index, onUpgrade }) {
+  const [loading, setLoading] = useState(false)
+
+  function handleClick(e) {
+    if (onUpgrade && plan.name !== 'Free') {
+      e.preventDefault()
+      setLoading(true)
+      onUpgrade(plan.name.toLowerCase(), () => setLoading(false))
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -458,22 +470,46 @@ function PricingCard({ plan, index }) {
 
       {/* CTA — pinned to bottom via mt-auto */}
       <div className="mt-auto">
-        <Link
-          to="/register"
-          className="block w-full py-3 rounded-xl text-center font-semibold text-sm transition-all hover:brightness-110 active:scale-[0.97]"
-          style={{
-            background: plan.popular
-              ? 'linear-gradient(135deg, #7c3aed, #8b5cf6)'
-              : 'rgba(255,255,255,0.06)',
-            color: plan.popular ? '#fff' : '#d4d4e8',
-            border: plan.popular ? 'none' : '1px solid rgba(255,255,255,0.1)',
-            boxShadow: plan.popular
-              ? '0 0 20px rgba(139,92,246,0.3)'
-              : 'none',
-          }}
-        >
-          {plan.cta}
-        </Link>
+        {onUpgrade && plan.name !== 'Free' ? (
+          <button
+            onClick={handleClick}
+            disabled={loading}
+            className="block w-full py-3 rounded-xl text-center font-semibold text-sm transition-all hover:brightness-110 active:scale-[0.97] disabled:opacity-50 cursor-pointer"
+            style={{
+              background: plan.popular
+                ? 'linear-gradient(135deg, #7c3aed, #8b5cf6)'
+                : 'rgba(255,255,255,0.06)',
+              color: plan.popular ? '#fff' : '#d4d4e8',
+              border: plan.popular ? 'none' : '1px solid rgba(255,255,255,0.1)',
+              boxShadow: plan.popular
+                ? '0 0 20px rgba(139,92,246,0.3)'
+                : 'none',
+            }}
+          >
+            {loading ? (
+              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              plan.cta
+            )}
+          </button>
+        ) : (
+          <Link
+            to={onUpgrade ? '/dashboard' : '/register'}
+            className="block w-full py-3 rounded-xl text-center font-semibold text-sm transition-all hover:brightness-110 active:scale-[0.97]"
+            style={{
+              background: plan.popular
+                ? 'linear-gradient(135deg, #7c3aed, #8b5cf6)'
+                : 'rgba(255,255,255,0.06)',
+              color: plan.popular ? '#fff' : '#d4d4e8',
+              border: plan.popular ? 'none' : '1px solid rgba(255,255,255,0.1)',
+              boxShadow: plan.popular
+                ? '0 0 20px rgba(139,92,246,0.3)'
+                : 'none',
+            }}
+          >
+            {plan.cta}
+          </Link>
+        )}
       </div>
     </motion.div>
   )
@@ -502,7 +538,38 @@ function TrustBadge({ icon: Icon, text }) {
 export default function Landing() {
   const [billing, setBilling] = useState('monthly')
   const location = useLocation()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+
+  // Currency detection for Razorpay
+  const detectCurrency = () => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''
+      return tz.startsWith('Asia/Kolkata') || tz.startsWith('Asia/Calcutta') ? 'INR' : 'USD'
+    } catch {
+      return 'INR'
+    }
+  }
+
+  // Razorpay upgrade handler for authenticated users
+  const handlePricingUpgrade = isAuthenticated
+    ? (planName, onDone) => {
+        openRazorpayCheckout({
+          plan: planName,
+          billingCycle: billing,
+          currency: detectCurrency(),
+          user,
+          onSuccess: () => {
+            onDone?.()
+            toast.success(`Welcome to ${planName.charAt(0).toUpperCase() + planName.slice(1)}! Redirecting to dashboard...`)
+            setTimeout(() => { window.location.href = '/dashboard' }, 1500)
+          },
+          onError: (err) => {
+            onDone?.()
+            toast.error(typeof err === 'string' ? err : 'Payment failed. Please try again.')
+          },
+        })
+      }
+    : null
 
   // Refs
   const orb1 = useRef(null)
@@ -1060,7 +1127,7 @@ export default function Landing() {
           {/* Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch pt-4">
             {plans.map((plan, i) => (
-              <PricingCard key={plan.name} plan={plan} index={i} />
+              <PricingCard key={plan.name} plan={plan} index={i} onUpgrade={handlePricingUpgrade} />
             ))}
           </div>
         </div>
@@ -1251,7 +1318,7 @@ export default function Landing() {
                 <FaTwitter size={16} />
               </a>
               <a
-                href="https://linkedin.com/company/tabcrypt"
+                href="https://linkedin.com/in/tabcrypt"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted hover:text-text transition-colors"
@@ -1281,7 +1348,7 @@ export default function Landing() {
             <p>
               Built by{' '}
               <a
-                href="https://tabcrypt.com"
+                href="https://tabcrypt.in"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-amber hover:underline"
