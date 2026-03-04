@@ -1,5 +1,5 @@
 """
-OAuth 2.0 flows for LinkedIn and Reddit.
+OAuth 2.0 flows for LinkedIn, Reddit, and X/Twitter.
 
 The PostPilot server owner registers one app per platform and puts
 their CLIENT_ID / CLIENT_SECRET in .env.  End-users just click
@@ -8,13 +8,17 @@ their CLIENT_ID / CLIENT_SECRET in .env.  End-users just click
 Flow:
   1. Frontend calls GET /api/oauth/{platform}/authorize (with JWT Bearer).
   2. Backend builds the platform authorization URL, embeds a signed
-     short-lived state token containing user_id, returns {redirect_url}.
+     short-lived state token containing user_id (and code_verifier for
+     Twitter PKCE), returns {redirect_url}.
   3. Frontend does window.location.href = redirect_url.
   4. Platform redirects to GET /api/oauth/{platform}/callback?code=…&state=…
   5. Backend verifies state, exchanges code for tokens, stores in DB,
      redirects to FRONTEND_URL/settings?connected={platform}.
   6. Frontend shows a success toast and re-fetches connection status.
 """
+import hashlib
+import base64
+import secrets
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -33,11 +37,12 @@ from app.services.encryption import encrypt_value, decrypt_value
 
 router = APIRouter(prefix="/api/oauth", tags=["oauth"])
 
-ALLOWED_PLATFORMS = ("linkedin", "reddit")
+ALLOWED_PLATFORMS = ("linkedin", "reddit", "twitter")
 
 # ── State helpers ─────────────────────────────────────────────────────────────
 
 def _create_state(user_id: int) -> str:
+    """Standard state JWT for LinkedIn and Reddit (no PKCE)."""
     payload = {
         "user_id": user_id,
         "exp": datetime.utcnow() + timedelta(minutes=10),
@@ -53,7 +58,36 @@ def _decode_state(state: str) -> int:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
 
-# ── Platform-specific builders ────────────────────────────────────────────────
+def _create_twitter_state(user_id: int, code_verifier: str) -> str:
+    """Twitter state JWT — also carries the PKCE code_verifier."""
+    payload = {
+        "user_id": user_id,
+        "cv": code_verifier,
+        "exp": datetime.utcnow() + timedelta(minutes=10),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
+
+
+def _decode_twitter_state(state: str) -> tuple[int, str]:
+    try:
+        payload = jwt.decode(state, settings.JWT_SECRET, algorithms=["HS256"])
+        return int(payload["user_id"]), payload["cv"]
+    except (JWTError, KeyError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid or expired Twitter OAuth state")
+
+
+# ── PKCE helpers ──────────────────────────────────────────────────────────────
+
+def _pkce_pair() -> tuple[str, str]:
+    """Generate (code_verifier, code_challenge) for PKCE S256."""
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()
+    ).decode().rstrip("=")
+    return verifier, challenge
+
+
+# ── Platform-specific auth URL builders ───────────────────────────────────────
 
 def _linkedin_authorize_url(state: str) -> str:
     if not settings.LINKEDIN_CLIENT_ID:
@@ -82,10 +116,27 @@ def _reddit_authorize_url(state: str) -> str:
     return f"https://www.reddit.com/api/v1/authorize?{params}"
 
 
+def _twitter_authorize_url(state: str, code_challenge: str) -> str:
+    if not settings.TWITTER_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Twitter OAuth not configured (TWITTER_CLIENT_ID missing)")
+    # Scopes: tweet.read tweet.write users.read media.write offline.access
+    scopes = "tweet.read%20tweet.write%20users.read%20media.write%20offline.access"
+    params = (
+        f"response_type=code"
+        f"&client_id={settings.TWITTER_CLIENT_ID}"
+        f"&redirect_uri={settings.TWITTER_REDIRECT_URI}"
+        f"&scope={scopes}"
+        f"&state={state}"
+        f"&code_challenge={code_challenge}"
+        f"&code_challenge_method=S256"
+    )
+    return f"https://x.com/i/oauth2/authorize?{params}"
+
+
 # ── Token exchange ────────────────────────────────────────────────────────────
 
 async def _exchange_linkedin(code: str) -> dict:
-    """Exchange auth code for LinkedIn access token. Returns {access_token, username}."""
+    """Exchange auth code for LinkedIn access token."""
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(
             "https://www.linkedin.com/oauth/v2/accessToken",
@@ -102,9 +153,8 @@ async def _exchange_linkedin(code: str) -> dict:
             raise HTTPException(status_code=502, detail=f"LinkedIn token error: {resp.text}")
         data = resp.json()
         access_token = data["access_token"]
-        expires_in   = data.get("expires_in", 5184000)  # ~60 days default
+        expires_in   = data.get("expires_in", 5184000)
 
-        # Fetch profile to get display name (OpenID Connect userinfo)
         me_resp = await client.get(
             "https://api.linkedin.com/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -123,7 +173,7 @@ async def _exchange_linkedin(code: str) -> dict:
 
 
 async def _exchange_reddit(code: str) -> dict:
-    """Exchange auth code for Reddit access + refresh tokens. Returns {access_token, refresh_token, username}."""
+    """Exchange auth code for Reddit access + refresh tokens."""
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(
             "https://www.reddit.com/api/v1/access_token",
@@ -141,7 +191,6 @@ async def _exchange_reddit(code: str) -> dict:
         access_token  = data["access_token"]
         refresh_token = data.get("refresh_token", "")
 
-        # Fetch Reddit username
         me_resp = await client.get(
             "https://oauth.reddit.com/api/v1/me",
             headers={
@@ -157,7 +206,45 @@ async def _exchange_reddit(code: str) -> dict:
         "access_token": access_token,
         "refresh_token": refresh_token,
         "username": username,
-        "expires_at": None,  # Reddit tokens are permanent via refresh_token
+        "expires_at": None,
+    }
+
+
+async def _exchange_twitter(code: str, code_verifier: str) -> dict:
+    """Exchange auth code + PKCE verifier for X/Twitter OAuth 2.0 tokens."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://api.x.com/2/oauth2/token",
+            data={
+                "code": code,
+                "grant_type": "authorization_code",
+                "client_id": settings.TWITTER_CLIENT_ID,
+                "redirect_uri": settings.TWITTER_REDIRECT_URI,
+                "code_verifier": code_verifier,
+            },
+            auth=(settings.TWITTER_CLIENT_ID, settings.TWITTER_CLIENT_SECRET),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Twitter token error: {resp.text}")
+        data = resp.json()
+        access_token  = data["access_token"]
+        refresh_token = data.get("refresh_token", "")
+
+        # Fetch username via /2/users/me
+        me_resp = await client.get(
+            "https://api.x.com/2/users/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        username = "X User"
+        if me_resp.status_code == 200:
+            username = f"@{me_resp.json().get('data', {}).get('username', 'unknown')}"
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token if refresh_token else None,
+        "username": username,
+        "expires_at": datetime.utcnow() + timedelta(hours=2),  # X tokens expire in 2h
     }
 
 
@@ -168,7 +255,7 @@ def get_connections(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return connection status for linkedin and reddit."""
+    """Return connection status for all OAuth platforms."""
     result = {}
     for platform in ALLOWED_PLATFORMS:
         conn = (
@@ -197,11 +284,16 @@ def authorize(
     if platform not in ALLOWED_PLATFORMS:
         raise HTTPException(status_code=400, detail=f"Unsupported platform: {platform}")
 
-    state = _create_state(current_user.id)
     if platform == "linkedin":
-        url = _linkedin_authorize_url(state)
-    else:
-        url = _reddit_authorize_url(state)
+        state = _create_state(current_user.id)
+        url   = _linkedin_authorize_url(state)
+    elif platform == "reddit":
+        state = _create_state(current_user.id)
+        url   = _reddit_authorize_url(state)
+    elif platform == "twitter":
+        code_verifier, code_challenge = _pkce_pair()
+        state = _create_twitter_state(current_user.id, code_verifier)
+        url   = _twitter_authorize_url(state, code_challenge)
 
     return {"redirect_url": url, "platform": platform}
 
@@ -215,22 +307,24 @@ async def callback(
 ):
     """
     Handle the OAuth callback from the platform.
-    Stores tokens in DB, then redirects the browser back to the frontend.
-    NOTE: This endpoint is called by the platform (not the frontend), so there
-    is no JWT Bearer — user identity is recovered from the signed state token.
+    NOTE: No JWT Bearer — user identity is recovered from the signed state token.
     """
     if platform not in ALLOWED_PLATFORMS:
         return RedirectResponse(f"{settings.FRONTEND_URL}/settings?error=bad_platform")
 
-    user_id = _decode_state(state)
-
+    # Decode state (Twitter also extracts code_verifier)
     try:
-        if platform == "linkedin":
-            token_data = await _exchange_linkedin(code)
+        if platform == "twitter":
+            user_id, code_verifier = _decode_twitter_state(state)
+            token_data = await _exchange_twitter(code, code_verifier)
         else:
-            token_data = await _exchange_reddit(code)
+            user_id = _decode_state(state)
+            if platform == "linkedin":
+                token_data = await _exchange_linkedin(code)
+            else:
+                token_data = await _exchange_reddit(code)
     except HTTPException as exc:
-        return RedirectResponse(f"{settings.FRONTEND_URL}/settings?error={exc.detail[:40]}")
+        return RedirectResponse(f"{settings.FRONTEND_URL}/settings?error={exc.detail[:60]}")
 
     # Upsert SocialConnection
     conn = (

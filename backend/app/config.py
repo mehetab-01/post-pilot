@@ -29,5 +29,12 @@ class Settings:
         "REDDIT_REDIRECT_URI", "http://localhost:8000/api/oauth/reddit/callback"
     )
 
+    # X / Twitter OAuth 2.0 with PKCE (Free tier — 500 posts/month)
+    TWITTER_CLIENT_ID: str     = os.getenv("TWITTER_CLIENT_ID", "")
+    TWITTER_CLIENT_SECRET: str = os.getenv("TWITTER_CLIENT_SECRET", "")
+    TWITTER_REDIRECT_URI: str  = os.getenv(
+        "TWITTER_REDIRECT_URI", "http://localhost:8000/api/oauth/twitter/callback"
+    )
+
 
 settings = Settings()

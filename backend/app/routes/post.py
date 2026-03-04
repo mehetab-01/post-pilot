@@ -16,6 +16,7 @@ from app.schemas.schemas import (
 from app.security import get_current_user
 from app.services import linkedin_service, reddit_service, twitter_service
 from app.services.encryption import decrypt_value
+from app.plans import require_plan
 
 router = APIRouter(prefix="/api/post", tags=["post"])
 
@@ -92,6 +93,8 @@ def post_all(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_plan(current_user, "starter", "Direct posting")
+
     results: list[PlatformPostResult] = []
     for platform, post_data in payload.posts.items():
         req = PostToPlatformRequest(
@@ -111,6 +114,8 @@ def post_to_platform(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_plan(current_user, "starter", "Direct posting")
+
     result = _do_post(platform, payload, db, current_user)
     if not result.success:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=result.error)
@@ -129,13 +134,13 @@ def _do_post(
 
     try:
         if platform == "twitter":
-            keys = _get_keys(db, current_user.id, "twitter")
-            if not keys:
+            conn = _get_social_connection(db, current_user.id, "twitter")
+            if not conn or not conn.access_token_enc:
                 return PlatformPostResult(
                     platform=platform, success=False,
-                    error="No Twitter API keys saved. Add them in Settings.",
+                    error="X/Twitter not connected. Click 'Connect with X' in Settings.",
                 )
-            result_data = _post_twitter(keys, payload, media_paths)
+            result_data = _post_twitter_oauth2(conn, payload, media_paths, db)
 
         elif platform == "linkedin":
             conn = _get_social_connection(db, current_user.id, "linkedin")
@@ -176,31 +181,38 @@ def _do_post(
     return PlatformPostResult(platform=platform, success=True, post_url=post_url)
 
 
-def _post_twitter(keys: dict, payload: PostToPlatformRequest, media_paths: list[str]) -> dict:
-    required = {"api_key", "api_secret", "access_token", "access_token_secret"}
-    missing = required - keys.keys()
-    if missing:
-        raise ValueError(f"Missing Twitter keys: {', '.join(missing)}")
+def _post_twitter_oauth2(
+    conn: SocialConnection,
+    payload: PostToPlatformRequest,
+    media_paths: list[str],
+    db: Session,
+) -> dict:
+    """Post to X/Twitter using OAuth 2.0 user token. Auto-refreshes on 401."""
+    from app.config import settings as cfg
+
+    access_token  = decrypt_value(conn.access_token_enc)
+    refresh_token = decrypt_value(conn.refresh_token_enc) if conn.refresh_token_enc else None
 
     thread_tweets: list[str] = payload.options.get("thread_tweets", [])
-    if thread_tweets:
-        return twitter_service.post_thread(
-            api_key=keys["api_key"],
-            api_secret=keys["api_secret"],
-            access_token=keys["access_token"],
-            access_token_secret=keys["access_token_secret"],
-            tweets=thread_tweets,
-            media_paths=media_paths or None,
-        )
 
-    return twitter_service.post_tweet(
-        api_key=keys["api_key"],
-        api_secret=keys["api_secret"],
-        access_token=keys["access_token"],
-        access_token_secret=keys["access_token_secret"],
-        content=payload.content,
-        media_paths=media_paths or None,
-    )
+    def _do_tweet(token: str) -> dict:
+        if thread_tweets:
+            return twitter_service.post_thread_oauth2(token, thread_tweets, media_paths or None)
+        return twitter_service.post_tweet_oauth2(token, payload.content, media_paths or None)
+
+    try:
+        return _do_tweet(access_token)
+    except ValueError as exc:
+        if str(exc) != "TOKEN_EXPIRED" or not refresh_token:
+            raise
+        # Token expired — refresh and retry once
+        new_tokens = twitter_service.refresh_oauth2_token(
+            refresh_token, cfg.TWITTER_CLIENT_ID, cfg.TWITTER_CLIENT_SECRET
+        )
+        conn.access_token_enc = encrypt_value(new_tokens["access_token"])
+        conn.refresh_token_enc = encrypt_value(new_tokens["refresh_token"])
+        db.commit()
+        return _do_tweet(new_tokens["access_token"])
 
 
 def _post_linkedin(conn: SocialConnection, payload: PostToPlatformRequest, media_paths: list[str]) -> dict:
