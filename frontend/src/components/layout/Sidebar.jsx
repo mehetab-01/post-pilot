@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Compass, Clock, Settings, LogOut, LayoutTemplate, Zap } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -6,6 +6,7 @@ import gsap from 'gsap'
 import { clsx } from 'clsx'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUsage } from '@/contexts/UsageContext'
+import { UpgradeModal } from '@/components/dashboard/UpgradeModal'
 
 const NAV_ITEMS = [
   { to: '/dashboard', icon: Compass,        label: 'Create'    },
@@ -118,7 +119,7 @@ function NavItem({ to, icon: Icon, label, onClick }) {
 }
 
 // ── Usage bar ─────────────────────────────────────────────────────────────────
-function UsageBar() {
+function UsageBar({ onUpgrade }) {
   const { plan, used, limit, pct, daysUntilReset, isFree, loading } = useUsage()
 
   if (loading) return null
@@ -157,14 +158,14 @@ function UsageBar() {
         {limit - used} posts left · resets in {daysUntilReset}d
       </p>
       {isFree && (
-        <a
-          href="/"
-          className="flex items-center justify-center gap-1.5 mt-2 py-1.5 rounded-lg text-[11px] font-semibold text-white transition-all hover:brightness-110"
+        <button
+          onClick={onUpgrade}
+          className="flex items-center justify-center gap-1.5 mt-2 py-1.5 rounded-lg text-[11px] font-semibold text-white transition-all hover:brightness-110 w-full cursor-pointer"
           style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)' }}
         >
           <Zap size={11} />
           Upgrade
-        </a>
+        </button>
       )}
     </div>
   )
@@ -174,6 +175,7 @@ function UsageBar() {
 export function Sidebar({ mobileOpen, onCloseMobile }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   function handleLogout() {
     logout()
@@ -184,6 +186,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }) {
   const initials = user?.username?.charAt(0).toUpperCase() ?? '?'
 
   return (
+    <>
     <aside
       className={clsx(
         'fixed top-0 left-0 h-full w-[260px] flex flex-col z-40',
@@ -212,7 +215,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }) {
         ))}
       </nav>
 
-      <UsageBar />
+      <UsageBar onUpgrade={() => setUpgradeOpen(true)} />
 
       <div
         className="mx-3 mb-3 p-3 rounded-xl flex items-center gap-3"
@@ -242,5 +245,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }) {
         </button>
       </div>
     </aside>
+    <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+    </>
   )
 }

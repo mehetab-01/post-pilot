@@ -33,9 +33,15 @@ class User(Base):
     plan_expires_at = Column(DateTime, nullable=True)
     billing_cycle_start = Column(DateTime, default=datetime.utcnow)
 
+    billing_cycle = Column(String, nullable=True)           # monthly | yearly
+    razorpay_order_id = Column(String, nullable=True)        # last order
+    razorpay_payment_id = Column(String, nullable=True)      # last payment
+    plan_cancelled = Column(Boolean, default=False)          # cancel pending
+
     api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
     posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")
     media = relationship("Media", back_populates="user", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
 
 
 class ApiKey(Base):
@@ -107,3 +113,20 @@ class Template(Base):
     preview_example  = Column(Text, nullable=True)
     icon             = Column(String, nullable=True)
     color            = Column(String, nullable=True)
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    user_id             = Column(Integer, ForeignKey("users.id"), nullable=False)
+    razorpay_order_id   = Column(String, nullable=False)
+    razorpay_payment_id = Column(String, nullable=True)
+    amount              = Column(Integer, nullable=False)   # in paise
+    currency            = Column(String, nullable=False, default="INR")
+    plan                = Column(String, nullable=False)
+    billing_cycle       = Column(String, nullable=False)    # monthly | yearly
+    status              = Column(String, nullable=False, default="created")  # created | paid | failed
+    created_at          = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="payments")

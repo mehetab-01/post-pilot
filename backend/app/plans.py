@@ -61,21 +61,61 @@ def get_plan_config(plan: str) -> dict:
     return PLAN_CONFIG.get(plan, PLAN_CONFIG["free"])
 
 
+# IST is UTC+5:30
+_IST_OFFSET = timedelta(hours=5, minutes=30)
+
+
+def _utc_now_ist_midnight() -> datetime:
+    """Return the most recent IST midnight (00:00) as a UTC datetime."""
+    now_utc = datetime.utcnow()
+    now_ist = now_utc + _IST_OFFSET
+    midnight_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+    return midnight_ist - _IST_OFFSET   # convert back to UTC
+
+
+def _next_cycle_reset(user) -> datetime:
+    """
+    Calculate the next 30-day billing cycle reset point.
+    Anchored to the account creation date (or billing_cycle_start).
+    The cycle resets every 30 days from the anchor, at 00:00 IST.
+    """
+    now_utc = datetime.utcnow()
+    anchor = user.billing_cycle_start or user.created_at or now_utc
+
+    # Walk forward in 30-day increments from anchor until we pass now
+    reset = anchor
+    while reset <= now_utc:
+        reset = reset + timedelta(days=30)
+
+    # Snap to 00:00 IST on that day
+    reset_ist = reset + _IST_OFFSET
+    reset_ist = reset_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+    return reset_ist - _IST_OFFSET  # back to UTC
+
+
 def maybe_reset_cycle(user, db: Session) -> None:
-    """Reset generations_used if billing cycle has rolled over (30-day window)."""
-    now = datetime.utcnow()
-    cycle_start = user.billing_cycle_start or user.created_at or now
-    if now >= cycle_start + timedelta(days=30):
+    """
+    Reset generations_used when the 30-day billing cycle has rolled over.
+    Cycles are anchored to account creation date and reset at 00:00 IST.
+    """
+    now_utc = datetime.utcnow()
+    anchor = user.billing_cycle_start or user.created_at or now_utc
+
+    # Find how many full 30-day periods have passed
+    elapsed = (now_utc - anchor).total_seconds()
+    if elapsed >= 30 * 86400:
+        # Advance anchor to the most recent 30-day boundary
+        periods = int(elapsed / (30 * 86400))
+        new_anchor = anchor + timedelta(days=30 * periods)
         user.generations_used = 0
-        user.billing_cycle_start = now
+        user.billing_cycle_start = new_anchor
         db.commit()
 
 
 def days_until_reset(user) -> int:
-    now = datetime.utcnow()
-    cycle_start = user.billing_cycle_start or user.created_at or now
-    next_reset = cycle_start + timedelta(days=30)
-    delta = (next_reset - now).days
+    now_utc = datetime.utcnow()
+    next_reset = _next_cycle_reset(user)
+    delta = (next_reset - now_utc).days
     return max(delta, 0)
 
 

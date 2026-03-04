@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.database import Base, engine
-from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers, analyze, templates, usage
+from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers, analyze, templates, usage, billing
 
 app = FastAPI(
     title="PostPilot API",
@@ -42,6 +42,7 @@ app.include_router(ai_providers.router)
 app.include_router(analyze.router)
 app.include_router(templates.router)
 app.include_router(usage.router)
+app.include_router(billing.router)
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
@@ -65,6 +66,10 @@ def on_startup():
             ("plan_started_at",     "DATETIME"),
             ("plan_expires_at",     "DATETIME"),
             ("billing_cycle_start", "DATETIME"),
+            ("billing_cycle",       "VARCHAR"),
+            ("razorpay_order_id",   "VARCHAR"),
+            ("razorpay_payment_id", "VARCHAR"),
+            ("plan_cancelled",      "BOOLEAN DEFAULT 0"),
         ]
         for col_name, col_def in _new_cols:
             if col_name not in existing:
@@ -120,6 +125,10 @@ if _DIST.exists():
     # Catch-all: serve index.html for React Router paths
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
+        # Never intercept API routes
+        if full_path.startswith("api/") or full_path == "api":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not found")
         f = _DIST / full_path
         if f.exists() and f.is_file():
             return FileResponse(f)

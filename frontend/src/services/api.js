@@ -53,6 +53,9 @@ export const authApi = {
     api.post('/api/auth/login', { username, password }),
 
   me: () => api.get('/api/auth/me'),
+
+  deleteAccount: (confirmation) =>
+    api.delete('/api/auth/account', { data: { confirmation } }),
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -140,6 +143,18 @@ export const templatesApi = {
 export const usageApi = {
   getUsage: () => api.get('/api/usage'),
   upgrade: (plan) => api.post('/api/upgrade', { plan }),
+}
+
+// ── Billing / Razorpay ────────────────────────────────────────────────────────
+export const billingApi = {
+  createOrder: (plan, billing_cycle, currency = 'INR') =>
+    api.post('/api/billing/create-order', { plan, billing_cycle, currency }),
+  verifyPayment: (data) =>
+    api.post('/api/billing/verify-payment', data),
+  getStatus: () =>
+    api.get('/api/billing/status'),
+  cancel: () =>
+    api.post('/api/billing/cancel'),
 }
 
 export default api

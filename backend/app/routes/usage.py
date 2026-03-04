@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.models import User
 from app.plans import PLAN_CONFIG, build_usage_response, get_plan_config
 from app.security import get_current_user
+from app.routes.billing import check_plan_expiry
 
 router = APIRouter(prefix="/api", tags=["usage"])
 
@@ -35,6 +36,7 @@ def get_usage(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    check_plan_expiry(current_user, db)
     return build_usage_response(current_user, db)
 
 

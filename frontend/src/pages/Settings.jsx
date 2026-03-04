@@ -6,6 +6,7 @@ import { PageTransition } from '@/components/layout/PageTransition'
 import { PlatformKeySection } from '@/components/settings/PlatformKeySection'
 import { StatusSidebar } from '@/components/settings/StatusSidebar'
 import { DangerZone } from '@/components/settings/DangerZone'
+import { BillingSection } from '@/components/settings/BillingSection'
 import { AiProviders } from '@/components/settings/AiProviders'
 import { PLATFORM_CONFIGS } from '@/components/settings/configs'
 import { getKeys } from '@/services/settings'
@@ -156,10 +157,22 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* ── Account / Danger zone ── */}
+          {/* ── Billing & Subscription ── */}
           {!isLoading && (
             <div
               ref={(el) => (sectionsRef.current[PLATFORM_CONFIGS.length + 2] = el)}
+            >
+              <p className="text-[11px] font-medium text-muted uppercase tracking-widest mb-3">
+                Billing &amp; Subscription
+              </p>
+              <BillingSection />
+            </div>
+          )}
+
+          {/* ── Account / Danger zone ── */}
+          {!isLoading && (
+            <div
+              ref={(el) => (sectionsRef.current[PLATFORM_CONFIGS.length + 3] = el)}
             >
               <p className="text-[11px] font-medium text-muted uppercase tracking-widest mb-3">
                 Account
