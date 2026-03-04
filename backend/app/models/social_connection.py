@@ -6,7 +6,7 @@ from app.database import Base
 
 
 class SocialConnection(Base):
-    """Stores OAuth access/refresh tokens for social platforms (linkedin, reddit)."""
+    """Stores OAuth access/refresh tokens for social platforms (linkedin, reddit, twitter)."""
     __tablename__ = "social_connections"
 
     id               = Column(Integer, primary_key=True, index=True)

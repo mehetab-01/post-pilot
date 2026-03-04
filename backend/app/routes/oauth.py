@@ -346,6 +346,36 @@ async def callback(
     return RedirectResponse(f"{settings.FRONTEND_URL}/settings?connected={platform}")
 
 
+@router.post("/twitter/refresh")
+def refresh_twitter(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Proactively refresh X/Twitter OAuth 2.0 tokens (they expire every 2 h)."""
+    conn = (
+        db.query(SocialConnection)
+        .filter(SocialConnection.user_id == current_user.id, SocialConnection.platform == "twitter")
+        .first()
+    )
+    if not conn or not conn.refresh_token_enc:
+        raise HTTPException(status_code=404, detail="No Twitter connection with refresh token found")
+
+    from app.services.twitter_service import refresh_oauth2_token as _refresh
+
+    refresh_token = decrypt_value(conn.refresh_token_enc)
+    try:
+        new_tokens = _refresh(refresh_token, settings.TWITTER_CLIENT_ID, settings.TWITTER_CLIENT_SECRET)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Token refresh failed: {exc}")
+
+    conn.access_token_enc  = encrypt_value(new_tokens["access_token"])
+    conn.refresh_token_enc = encrypt_value(new_tokens["refresh_token"])
+    conn.expires_at        = datetime.utcnow() + timedelta(hours=2)
+    db.commit()
+
+    return {"success": True, "expires_at": conn.expires_at.isoformat()}
+
+
 @router.delete("/{platform}")
 def disconnect(
     platform: str,
