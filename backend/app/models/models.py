@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -23,6 +24,14 @@ class User(Base):
     email = Column(String, nullable=True)
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # ── Subscription / usage fields ──
+    plan = Column(String, nullable=False, default="free")
+    generations_used = Column(Integer, nullable=False, default=0)
+    generations_limit = Column(Integer, nullable=False, default=10)
+    plan_started_at = Column(DateTime, default=datetime.utcnow)
+    plan_expires_at = Column(DateTime, nullable=True)
+    billing_cycle_start = Column(DateTime, default=datetime.utcnow)
 
     api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
     posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")
@@ -77,3 +86,24 @@ class Media(Base):
 
     user = relationship("User", back_populates="media")
     post = relationship("Post", back_populates="media")
+
+
+class Template(Base):
+    __tablename__ = "templates"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    user_id          = Column(Integer, ForeignKey("users.id"), nullable=True)  # null = built-in
+    name             = Column(String, nullable=False)
+    description      = Column(String, nullable=True)
+    category         = Column(String, nullable=False, default="custom")
+    context_template = Column(Text, nullable=False)
+    platforms        = Column(JSON, nullable=True)   # list[str]
+    tones            = Column(JSON, nullable=True)   # {platform: tone}
+    is_public        = Column(Boolean, default=False)
+    use_count        = Column(Integer, default=0)
+    created_at       = Column(DateTime, default=datetime.utcnow)
+    # Premium template metadata
+    tier             = Column(String, nullable=False, default="free")  # free | starter | pro
+    preview_example  = Column(Text, nullable=True)
+    icon             = Column(String, nullable=True)
+    color            = Column(String, nullable=True)

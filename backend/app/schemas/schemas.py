@@ -27,6 +27,9 @@ class UserResponse(BaseModel):
     username: str
     email: Optional[str] = None
     created_at: datetime
+    plan: Optional[str] = "free"
+    generations_used: Optional[int] = 0
+    generations_limit: Optional[int] = 10
 
     class Config:
         from_attributes = True
@@ -123,6 +126,7 @@ class EnhanceRequest(BaseModel):
     platform: str
     content: str
     tone: str
+    additional_instructions: Optional[str] = None
 
 
 class HumanizeRequest(BaseModel):
@@ -188,6 +192,45 @@ class PostAllResponse(BaseModel):
     results: List[PlatformPostResult]
 
 
+# ── Humanize Score ────────────────────────────────────────────────────────────
+
+class HumanizeScoreRequest(BaseModel):
+    content: str
+    platform: str
+
+
+class HumanizeScoreFlag(BaseModel):
+    phrase: str
+    reason: str
+
+
+class HumanizeScoreResponse(BaseModel):
+    score: int
+    level: str  # "human" | "mixed" | "ai"
+    flags: List[HumanizeScoreFlag]
+    tips: List[str]
+
+
+# ── Originality Check ─────────────────────────────────────────────────────────
+
+class OriginalityCheckRequest(BaseModel):
+    content: str
+    platform: str
+
+
+class OriginalityGenericPhrase(BaseModel):
+    phrase: str
+    suggestion: str
+
+
+class OriginalityCheckResponse(BaseModel):
+    originality_score: int
+    level: str  # "good" | "mixed" | "generic"
+    generic_phrases: List[OriginalityGenericPhrase]
+    improvements: List[str]
+    verdict: str
+
+
 # ── History ───────────────────────────────────────────────────────────────────
 
 class HistoryItem(BaseModel):
@@ -208,3 +251,44 @@ class HistoryResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+# ── Templates ─────────────────────────────────────────────────────────────────
+
+class TemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    category: str = "custom"
+    context_template: str
+    platforms: Optional[List[str]] = None
+    tones: Optional[Dict[str, str]] = None
+
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    context_template: Optional[str] = None
+    platforms: Optional[List[str]] = None
+    tones: Optional[Dict[str, str]] = None
+
+
+class TemplateResponse(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    name: str
+    description: Optional[str] = None
+    category: str
+    context_template: str
+    platforms: Optional[List[str]] = None
+    tones: Optional[Dict[str, str]] = None
+    is_public: bool
+    use_count: int
+    created_at: datetime
+    tier: str = "free"
+    preview_example: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
+    class Config:
+        from_attributes = True

@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.database import Base, engine
-from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers
+from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers, analyze, templates, usage
 
 app = FastAPI(
     title="PostPilot API",
@@ -39,6 +39,9 @@ app.include_router(history.router)
 app.include_router(media.router)
 app.include_router(oauth.router)
 app.include_router(ai_providers.router)
+app.include_router(analyze.router)
+app.include_router(templates.router)
+app.include_router(usage.router)
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
@@ -47,12 +50,56 @@ def on_startup():
     # Import new models so SQLAlchemy registers them before create_all
     import app.models.social_connection  # noqa: F401
     import app.models.ai_provider        # noqa: F401
+    import app.models.models             # noqa: F401  (registers Template)
     # Create all tables if they don't exist
     Base.metadata.create_all(bind=engine)
+
+    # ── Auto-migrate: add any missing columns to existing tables ──────────
+    from sqlalchemy import inspect as sa_inspect, text
+    with engine.connect() as conn:
+        existing = {c["name"] for c in sa_inspect(engine).get_columns("users")}
+        _new_cols = [
+            ("plan",                "VARCHAR DEFAULT 'free'"),
+            ("generations_used",    "INTEGER DEFAULT 0"),
+            ("generations_limit",   "INTEGER DEFAULT 10"),
+            ("plan_started_at",     "DATETIME"),
+            ("plan_expires_at",     "DATETIME"),
+            ("billing_cycle_start", "DATETIME"),
+        ]
+        for col_name, col_def in _new_cols:
+            if col_name not in existing:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}"))
+                conn.commit()
+
+    # ── Auto-migrate: add missing columns to templates ────────────────────
+    try:
+        tpl_existing = {c["name"] for c in sa_inspect(engine).get_columns("templates")}
+        _tpl_cols = [
+            ("tier",            "VARCHAR NOT NULL DEFAULT 'free'"),
+            ("preview_example", "TEXT"),
+            ("icon",            "VARCHAR"),
+            ("color",           "VARCHAR"),
+        ]
+        with engine.connect() as conn2:
+            for col_name, col_def in _tpl_cols:
+                if col_name not in tpl_existing:
+                    conn2.execute(text(f"ALTER TABLE templates ADD COLUMN {col_name} {col_def}"))
+                    conn2.commit()
+    except Exception:
+        pass  # templates table doesn't exist yet — create_all will handle it
 
     # Ensure upload directory exists
     from app.config import settings as cfg
     os.makedirs(cfg.UPLOAD_DIR, exist_ok=True)
+
+    # Seed built-in templates (skips if already seeded)
+    from app.routes.templates import seed_builtin_templates
+    from app.database import SessionLocal
+    _db = SessionLocal()
+    try:
+        seed_builtin_templates(_db)
+    finally:
+        _db.close()
 
 
 # ── Frontend static files (production) ───────────────────────────────────────
