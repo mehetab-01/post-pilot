@@ -36,5 +36,9 @@ class Settings:
         "TWITTER_REDIRECT_URI", "http://localhost:8000/api/oauth/twitter/callback"
     )
 
+    # Razorpay payments
+    RAZORPAY_KEY_ID: str     = os.getenv("RAZORPAY_KEY_ID", "")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+
 
 settings = Settings()
