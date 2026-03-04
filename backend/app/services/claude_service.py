@@ -145,17 +145,18 @@ def _build_generate_prompt(
         "",
         f"CONTEXT:\n{context}",
         "",
-        _LENGTH_GUIDE.get(length, _LENGTH_GUIDE["medium"]),
-        "",
-        "PLATFORMS TO GENERATE (respect the tone and options for each):",
+        "PLATFORMS TO GENERATE (respect the tone, options, and length for each):",
     ]
 
     for platform, opts in platforms.items():
-        option_parts = []
-        for k, v in opts.items():
-            option_parts.append(f"{k}={v}")
+        # Per-platform length — extracted from opts, not shown as a regular option
+        plat_length = opts.get("length", length)
+        length_hint = _LENGTH_GUIDE.get(plat_length, _LENGTH_GUIDE["medium"])
+
+        option_parts = [f"{k}={v}" for k, v in opts.items() if k != "length"]
         opts_str = ", ".join(option_parts) if option_parts else "default options"
         lines.append(f"- {platform}: {opts_str}")
+        lines.append(f"  {length_hint}")
 
     if media_info:
         lines.append("")
@@ -210,17 +211,27 @@ async def enhance_post(
     platform: str,
     current_content: str,
     tone: str,
+    additional_instructions: Optional[str] = None,
     model: str = "claude-sonnet-4-20250514",
 ) -> str:
     client = anthropic.AsyncAnthropic(api_key=api_key)
 
-    prompt = (
-        f"Take this {platform} post and make it significantly more engaging. "
-        f"Improve the hook, add more compelling language, increase viral potential. "
-        f"Keep the same tone ({tone}) and platform format. Keep the core message intact. "
-        f"Return ONLY the improved post text, nothing else.\n\n"
-        f"Current post:\n{current_content}"
-    )
+    if additional_instructions:
+        prompt = (
+            f"Rewrite this {platform} post following these specific instructions:\n"
+            f"{additional_instructions}\n\n"
+            f"Keep the same tone ({tone}) and platform format. "
+            f"Return ONLY the rewritten post text, nothing else.\n\n"
+            f"Current post:\n{current_content}"
+        )
+    else:
+        prompt = (
+            f"Take this {platform} post and make it significantly more engaging. "
+            f"Improve the hook, add more compelling language, increase viral potential. "
+            f"Keep the same tone ({tone}) and platform format. Keep the core message intact. "
+            f"Return ONLY the improved post text, nothing else.\n\n"
+            f"Current post:\n{current_content}"
+        )
 
     message = await client.messages.create(
         model=model,
@@ -229,6 +240,143 @@ async def enhance_post(
     )
 
     return message.content[0].text.strip()
+
+
+_SCORE_PROMPT_TEMPLATE = """\
+Analyze this {platform} post and rate how AI-generated it sounds on a scale of 0-100.
+0 = completely natural/human, 100 = obviously AI-generated.
+
+Check for these AI tell-tale patterns:
+- Corporate buzzwords: "leverage", "elevate", "foster", "synergy", "unlock"
+- Over-polished grammar with zero personal quirks or typos
+- Hollow filler phrases: "In today's world", "It's worth noting", "That being said", "At the end of the day"
+- Formulaic structure: hook → bullet points → CTA, every time, no variation
+- Absence of contractions, slang, or casual language
+- Overuse of em-dashes, semicolons, or parallel lists
+- Excessive hedging or overly balanced tone
+- Generic motivational sign-offs
+
+Return ONLY raw JSON — no markdown fences, no backticks, no prose:
+{{
+  "score": 45,
+  "level": "mixed",
+  "flags": [
+    {{"phrase": "exact phrase from the post", "reason": "why this sounds AI-written"}},
+    {{"phrase": "another phrase", "reason": "why this sounds AI-written"}}
+  ],
+  "tips": [
+    "Add a short personal anecdote or opinion",
+    "Replace 'leverage' with a plain verb like 'use'",
+    "Break the perfect structure — start mid-thought"
+  ]
+}}
+
+Rules:
+- level must be exactly one of: "human" (score 0-30), "mixed" (score 31-60), "ai" (score 61-100)
+- flags: 0-4 items, only the most impactful patterns; empty array if none found
+- tips: 2-3 short, actionable suggestions
+
+Post to analyze:
+{content}"""
+
+
+async def score_content(
+    api_key: str,
+    content: str,
+    platform: str,
+    model: str = "claude-sonnet-4-20250514",
+) -> dict:
+    """Analyze content and return an AI-detection score."""
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    prompt = _SCORE_PROMPT_TEMPLATE.format(content=content, platform=platform)
+
+    message = await client.messages.create(
+        model=model,
+        max_tokens=800,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = message.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1]
+        if raw.endswith("```"):
+            raw = raw.rsplit("```", 1)[0]
+        raw = raw.strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        # Return a neutral fallback so the route can handle it gracefully
+        return {"score": 50, "level": "mixed", "flags": [], "tips": []}
+
+
+_ORIGINALITY_PROMPT_TEMPLATE = """\
+You are a content originality analyst. Analyze this {platform} post for originality.
+
+Check for:
+1. Cliche AI phrases that appear in thousands of AI-generated posts
+2. Generic statements that could apply to anyone (not personalized)
+3. Overused social media formulas (e.g., "I did X. Here's what I learned:" followed by generic list)
+4. Content that reads like a template with no real substance
+5. Specific vs vague: does it include real details, numbers, names, or is it all abstract?
+
+Rate originality 0-100:
+- 0-40: Very generic, needs major personalization
+- 41-70: Somewhat original, could use more specific details
+- 71-100: Feels unique and personal
+
+Return ONLY raw JSON — no markdown fences, no backticks, no prose:
+{{
+  "originality_score": 72,
+  "level": "good",
+  "generic_phrases": [
+    {{"phrase": "exact generic phrase from the post", "suggestion": "replace with something specific like..."}},
+    {{"phrase": "another generic phrase", "suggestion": "try a concrete example instead"}}
+  ],
+  "improvements": [
+    "Add a specific number or metric",
+    "Name the actual tool/company/person"
+  ],
+  "verdict": "one sentence summary of the originality assessment"
+}}
+
+Rules:
+- level must be exactly one of: "good" (71-100), "mixed" (41-70), "generic" (0-40)
+- generic_phrases: 0-3 items, the most egregious generic patterns; empty array if none
+- improvements: 2-3 short, actionable suggestions
+- verdict: one sentence, honest and direct
+
+Post to analyze:
+{content}"""
+
+
+async def check_originality(
+    api_key: str,
+    content: str,
+    platform: str,
+    model: str = "claude-sonnet-4-20250514",
+) -> dict:
+    """Analyze content and return an originality score."""
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    prompt = _ORIGINALITY_PROMPT_TEMPLATE.format(content=content, platform=platform)
+
+    message = await client.messages.create(
+        model=model,
+        max_tokens=800,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = message.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1]
+        if raw.endswith("```"):
+            raw = raw.rsplit("```", 1)[0]
+        raw = raw.strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"originality_score": 55, "level": "mixed", "generic_phrases": [], "improvements": [], "verdict": ""}
 
 
 async def humanize_post(

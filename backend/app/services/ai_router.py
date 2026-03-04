@@ -79,6 +79,7 @@ async def enhance_post(
     platform: str,
     current_content: str,
     tone: str,
+    additional_instructions: Optional[str] = None,
 ) -> str:
     providers = _get_providers(db, user_id)
     if not providers:
@@ -92,11 +93,75 @@ async def enhance_post(
                 return await claude_service.enhance_post(
                     api_key=key, model=p.model,
                     platform=platform, current_content=current_content, tone=tone,
+                    additional_instructions=additional_instructions,
                 )
             else:
                 return await openai_compat_service.enhance_post(
                     api_key=key, model=p.model, provider=p.provider,
                     platform=platform, current_content=current_content, tone=tone,
+                    additional_instructions=additional_instructions,
+                )
+        except Exception as exc:
+            last_err = exc
+            continue
+
+    raise ValueError(f"All AI providers failed. Last error: {last_err}")
+
+
+async def score_content(
+    db: Session,
+    user_id: int,
+    content: str,
+    platform: str,
+) -> dict:
+    providers = _get_providers(db, user_id)
+    if not providers:
+        raise ValueError("No AI providers configured.")
+
+    last_err: Exception = Exception("Unknown error")
+    for p in providers:
+        try:
+            key = decrypt_value(p.encrypted_key)
+            if p.provider == "claude":
+                return await claude_service.score_content(
+                    api_key=key, model=p.model,
+                    content=content, platform=platform,
+                )
+            else:
+                return await openai_compat_service.score_content(
+                    api_key=key, model=p.model, provider=p.provider,
+                    content=content, platform=platform,
+                )
+        except Exception as exc:
+            last_err = exc
+            continue
+
+    raise ValueError(f"All AI providers failed. Last error: {last_err}")
+
+
+async def check_originality(
+    db: Session,
+    user_id: int,
+    content: str,
+    platform: str,
+) -> dict:
+    providers = _get_providers(db, user_id)
+    if not providers:
+        raise ValueError("No AI providers configured.")
+
+    last_err: Exception = Exception("Unknown error")
+    for p in providers:
+        try:
+            key = decrypt_value(p.encrypted_key)
+            if p.provider == "claude":
+                return await claude_service.check_originality(
+                    api_key=key, model=p.model,
+                    content=content, platform=platform,
+                )
+            else:
+                return await openai_compat_service.check_originality(
+                    api_key=key, model=p.model, provider=p.provider,
+                    content=content, platform=platform,
                 )
         except Exception as exc:
             last_err = exc

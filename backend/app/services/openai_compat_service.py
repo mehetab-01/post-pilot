@@ -12,7 +12,7 @@ from typing import Optional
 
 import openai
 
-from app.services.claude_service import SYSTEM_PROMPT, _build_generate_prompt
+from app.services.claude_service import SYSTEM_PROMPT, _build_generate_prompt, _SCORE_PROMPT_TEMPLATE, _ORIGINALITY_PROMPT_TEMPLATE
 
 PROVIDER_BASE_URLS = {
     "openai": None,                                                        # default OpenAI
@@ -77,15 +77,24 @@ async def enhance_post(
     platform: str,
     current_content: str,
     tone: str,
+    additional_instructions: str | None = None,
 ) -> str:
     client = _get_client(provider, api_key)
 
-    prompt = (
-        f"Take this {platform} post and make it significantly more engaging. "
-        f"Improve the hook, add more compelling language, increase viral potential. "
-        f"Keep the same tone ({tone}) and platform format. Keep the core message intact. "
-        f"Return ONLY the improved post text, nothing else.\n\nCurrent post:\n{current_content}"
-    )
+    if additional_instructions:
+        prompt = (
+            f"Rewrite this {platform} post following these specific instructions:\n"
+            f"{additional_instructions}\n\n"
+            f"Keep the same tone ({tone}) and platform format. "
+            f"Return ONLY the rewritten post text, nothing else.\n\nCurrent post:\n{current_content}"
+        )
+    else:
+        prompt = (
+            f"Take this {platform} post and make it significantly more engaging. "
+            f"Improve the hook, add more compelling language, increase viral potential. "
+            f"Keep the same tone ({tone}) and platform format. Keep the core message intact. "
+            f"Return ONLY the improved post text, nothing else.\n\nCurrent post:\n{current_content}"
+        )
 
     resp = await client.chat.completions.create(
         model=model,
@@ -119,3 +128,49 @@ async def humanize_post(
         messages=[{"role": "user", "content": prompt}],
     )
     return (resp.choices[0].message.content or "").strip()
+
+
+async def score_content(
+    api_key: str,
+    model: str,
+    provider: str,
+    content: str,
+    platform: str,
+) -> dict:
+    """Analyze content and return an AI-detection score."""
+    client = _get_client(provider, api_key)
+    prompt = _SCORE_PROMPT_TEMPLATE.format(content=content, platform=platform)
+
+    resp = await client.chat.completions.create(
+        model=model,
+        max_tokens=800,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = _strip_json_fences(resp.choices[0].message.content or "")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"score": 50, "level": "mixed", "flags": [], "tips": []}
+
+
+async def check_originality(
+    api_key: str,
+    model: str,
+    provider: str,
+    content: str,
+    platform: str,
+) -> dict:
+    """Analyze content and return an originality score."""
+    client = _get_client(provider, api_key)
+    prompt = _ORIGINALITY_PROMPT_TEMPLATE.format(content=content, platform=platform)
+
+    resp = await client.chat.completions.create(
+        model=model,
+        max_tokens=800,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = _strip_json_fences(resp.choices[0].message.content or "")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"originality_score": 55, "level": "mixed", "generic_phrases": [], "improvements": [], "verdict": ""}
