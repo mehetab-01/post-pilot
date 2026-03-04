@@ -1,0 +1,179 @@
+"""
+Plan definitions and usage-checking helpers for PostPilot freemium.
+"""
+
+from datetime import datetime, timedelta
+from typing import Optional
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+# ── Plan definitions ──────────────────────────────────────────────────────────
+
+PLAN_CONFIG = {
+    "free": {
+        "generations_limit": 10,
+        "max_platforms": 3,
+        "allowed_tones": {"professional", "casual", "educational"},
+        "direct_posting": False,
+        "humanizer": False,
+        "originality": False,
+        "all_tones": False,
+        "all_platforms": False,
+        "scheduling": False,
+        "history_days": None,        # unlimited for viewing, but no premium features
+    },
+    "starter": {
+        "generations_limit": 50,
+        "max_platforms": 99,
+        "allowed_tones": None,       # all tones
+        "direct_posting": True,
+        "humanizer": True,
+        "originality": True,
+        "all_tones": True,
+        "all_platforms": True,
+        "scheduling": False,
+        "history_days": 30,
+    },
+    "pro": {
+        "generations_limit": 200,
+        "max_platforms": 99,
+        "allowed_tones": None,
+        "direct_posting": True,
+        "humanizer": True,
+        "originality": True,
+        "all_tones": True,
+        "all_platforms": True,
+        "scheduling": True,
+        "history_days": None,        # unlimited
+    },
+}
+
+ALL_TONES = {
+    "professional", "casual", "hype", "storytelling",
+    "educational", "witty", "inspirational", "bold",
+}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def get_plan_config(plan: str) -> dict:
+    return PLAN_CONFIG.get(plan, PLAN_CONFIG["free"])
+
+
+def maybe_reset_cycle(user, db: Session) -> None:
+    """Reset generations_used if billing cycle has rolled over (30-day window)."""
+    now = datetime.utcnow()
+    cycle_start = user.billing_cycle_start or user.created_at or now
+    if now >= cycle_start + timedelta(days=30):
+        user.generations_used = 0
+        user.billing_cycle_start = now
+        db.commit()
+
+
+def days_until_reset(user) -> int:
+    now = datetime.utcnow()
+    cycle_start = user.billing_cycle_start or user.created_at or now
+    next_reset = cycle_start + timedelta(days=30)
+    delta = (next_reset - now).days
+    return max(delta, 0)
+
+
+def check_generation_limit(user, db: Session) -> None:
+    """Raise 403 if user has exhausted their generation quota."""
+    maybe_reset_cycle(user, db)
+    cfg = get_plan_config(user.plan or "free")
+    limit = cfg["generations_limit"]
+    used = user.generations_used or 0
+    if used >= limit:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "limit_reached",
+                "message": f"You've used all {limit} {user.plan or 'free'} generations this month",
+                "current_plan": user.plan or "free",
+                "used": used,
+                "limit": limit,
+                "upgrade_url": "/pricing",
+            },
+        )
+
+
+def increment_generation(user, db: Session, count: int = 1) -> None:
+    user.generations_used = (user.generations_used or 0) + count
+    db.commit()
+
+
+def check_platform_limit(user, platforms: dict) -> None:
+    """For free users only allow up to max_platforms."""
+    cfg = get_plan_config(user.plan or "free")
+    max_p = cfg["max_platforms"]
+    if len(platforms) > max_p:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "platform_limit",
+                "message": f"Free plan allows up to {max_p} platforms. Upgrade to unlock all.",
+                "current_plan": user.plan or "free",
+                "limit": max_p,
+                "upgrade_url": "/pricing",
+            },
+        )
+
+
+def check_tone_allowed(user, platforms: dict) -> None:
+    """For free users restrict to basic tones only."""
+    cfg = get_plan_config(user.plan or "free")
+    allowed = cfg["allowed_tones"]
+    if allowed is None:
+        return  # all tones OK
+    for platform, opts in platforms.items():
+        tone = opts.get("tone", "professional") if isinstance(opts, dict) else "professional"
+        if tone not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "tone_locked",
+                    "message": f"The '{tone}' tone requires a Starter or Pro plan.",
+                    "current_plan": user.plan or "free",
+                    "locked_tone": tone,
+                    "upgrade_url": "/pricing",
+                },
+            )
+
+
+def require_plan(user, minimum: str, feature_name: str) -> None:
+    """Ensure user is on at least `minimum` plan (starter or pro)."""
+    order = {"free": 0, "starter": 1, "pro": 2}
+    user_level = order.get(user.plan or "free", 0)
+    required_level = order.get(minimum, 1)
+    if user_level < required_level:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "feature_locked",
+                "message": f"{feature_name} requires a {minimum.title()} plan or higher.",
+                "current_plan": user.plan or "free",
+                "required_plan": minimum,
+                "upgrade_url": "/pricing",
+            },
+        )
+
+
+def build_usage_response(user, db: Session) -> dict:
+    maybe_reset_cycle(user, db)
+    cfg = get_plan_config(user.plan or "free")
+    return {
+        "plan": user.plan or "free",
+        "generations_used": user.generations_used or 0,
+        "generations_limit": cfg["generations_limit"],
+        "days_until_reset": days_until_reset(user),
+        "features": {
+            "direct_posting": cfg["direct_posting"],
+            "humanizer": cfg["humanizer"],
+            "originality": cfg["originality"],
+            "all_tones": cfg["all_tones"],
+            "all_platforms": cfg["all_platforms"],
+            "scheduling": cfg["scheduling"],
+        },
+    }
