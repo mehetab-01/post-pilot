@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   ExternalLink, ChevronDown, MoreHorizontal, Copy, RefreshCw, Trash2, Check, Eye,
@@ -21,16 +22,25 @@ function formatDate(iso) {
 // ── Three-dot actions menu ─────────────────────────────────────────────────────
 function ActionsMenu({ onView, onReuse, onCopy, onDelete }) {
   const [open, setOpen]   = useState(false)
-  const menuRef           = useRef(null)
+  const [pos, setPos]     = useState({ top: 0, right: 0 })
+  const btnRef            = useRef(null)
 
   useEffect(() => {
     if (!open) return
     function handler(e) {
-      if (!menuRef.current?.contains(e.target)) setOpen(false)
+      if (!btnRef.current?.contains(e.target)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
+
+  function handleOpen() {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    setOpen((v) => !v)
+  }
 
   const items = [
     { icon: Eye,       label: 'View full post',     action: onView   },
@@ -40,43 +50,54 @@ function ActionsMenu({ onView, onReuse, onCopy, onDelete }) {
   ]
 
   return (
-    <div ref={menuRef} className="relative flex-shrink-0">
+    <div className="flex-shrink-0">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleOpen}
         className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-zinc-800 transition-colors"
       >
         <MoreHorizontal size={15} />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-border bg-zinc-900 shadow-xl z-20 py-1 overflow-hidden"
-          >
-            {items.map(({ icon: Icon, label, action, danger }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => { action(); setOpen(false) }}
-                className={clsx(
-                  'w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors',
-                  danger
-                    ? 'text-danger hover:bg-red-950/40'
-                    : 'text-muted hover:text-text hover:bg-zinc-800',
-                )}
-              >
-                <Icon size={12} />
-                {label}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Dropdown rendered via portal to escape overflow:hidden card */}
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+              transition={{ duration: 0.12 }}
+              style={{
+                position: 'fixed',
+                top: pos.top,
+                right: pos.right,
+                zIndex: 9999,
+              }}
+              className="w-44 rounded-xl border border-border bg-zinc-900 shadow-xl py-1 overflow-hidden"
+            >
+              {items.map(({ icon: Icon, label, action, danger }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => { action(); setOpen(false) }}
+                  className={clsx(
+                    'w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors',
+                    danger
+                      ? 'text-danger hover:bg-red-950/40'
+                      : 'text-muted hover:text-text hover:bg-zinc-800',
+                  )}
+                >
+                  <Icon size={12} />
+                  {label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }
@@ -203,7 +224,7 @@ export function HistoryCard({ item, onDeleted }) {
         <div className="flex items-center gap-2.5 flex-shrink-0">
           <div
             className="w-1 self-stretch rounded-full min-h-[36px]"
-            style={{ background: cfg?.color ?? '#f59e0b' }}
+            style={{ background: cfg?.color ?? '#8b5cf6' }}
           />
           <div
             className="flex items-center justify-center w-8 h-8 rounded-xl flex-shrink-0"

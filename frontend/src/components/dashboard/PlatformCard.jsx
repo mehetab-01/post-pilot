@@ -6,12 +6,19 @@ import { TONES, TONE_MAP, DEFAULT_TONE } from './constants'
 import { TonePill } from './TonePill'
 import { PlatformOptions } from './PlatformOptions'
 
-export function PlatformCard({ platform, isSelected, selection, onToggle, onToneChange, onOptionChange }) {
+const LENGTH_OPTIONS = [
+  { id: 'short',    label: 'S', title: 'Short'    },
+  { id: 'medium',   label: 'M', title: 'Medium'   },
+  { id: 'detailed', label: 'D', title: 'Detailed' },
+]
+
+export function PlatformCard({ platform, isSelected, selection, onToggle, onToneChange, onOptionChange, onLengthChange, isToneLocked }) {
   const cardRef = useRef(null)
   const { id, label, Icon, color, rgb, desc } = platform
 
-  const selectedTone = selection?.tone ?? DEFAULT_TONE
-  const options      = selection?.options ?? {}
+  const selectedTone   = selection?.tone ?? DEFAULT_TONE
+  const selectedLength = selection?.length ?? 'medium'
+  const options        = selection?.options ?? {}
 
   function handleToggle() {
     if (!isSelected) {
@@ -96,7 +103,32 @@ export function PlatformCard({ platform, isSelected, selection, onToggle, onTone
                       tone={tone}
                       isSelected={selectedTone === tone.id}
                       onClick={(toneId) => onToneChange(id, toneId)}
+                      isLocked={isToneLocked?.(tone.id)}
                     />
+                  ))}
+                </div>
+              </div>
+
+              {/* Length toggle */}
+              <div>
+                <p className="text-xs font-medium text-muted uppercase tracking-widest mb-2">Length</p>
+                <div className="flex gap-1.5">
+                  {LENGTH_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      title={opt.title}
+                      onClick={() => onLengthChange(id, opt.id)}
+                      className={clsx(
+                        'px-3 py-1 rounded-lg text-xs font-semibold border transition-all',
+                        selectedLength === opt.id
+                          ? 'border-transparent text-white'
+                          : 'border-border text-muted hover:text-text hover:bg-zinc-800',
+                      )}
+                      style={selectedLength === opt.id ? { background: color, boxShadow: `0 0 8px rgba(${rgb},0.3)` } : {}}
+                    >
+                      {opt.title}
+                    </button>
                   ))}
                 </div>
               </div>

@@ -8,8 +8,8 @@ import { generateApi, postApi, mediaApi } from './api'
  * @param {number[]} mediaIds  IDs of already-uploaded Media records
  * @returns {Promise<{ generated: Array, posting_tips: object }>}
  */
-export async function generatePosts(context, platforms, additionalInstructions = null, mediaIds = [], length = 'medium') {
-  const res = await generateApi.generate(context, platforms, additionalInstructions, length)
+export async function generatePosts(context, platforms, additionalInstructions = null, mediaIds = []) {
+  const res = await generateApi.generate(context, platforms, additionalInstructions)
   return res.data
 }
 
@@ -24,8 +24,8 @@ export async function regeneratePost(platform, context, tone, options = {}) {
 /**
  * Enhance an existing post.
  */
-export async function enhancePost(platform, content, tone) {
-  const res = await generateApi.enhance(platform, content, tone)
+export async function enhancePost(platform, content, tone, additionalInstructions = null) {
+  const res = await generateApi.enhance(platform, content, tone, additionalInstructions)
   return res.data
 }
 

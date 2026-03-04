@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { Rocket } from 'lucide-react'
+import { Rocket, Lock } from 'lucide-react'
 import { clsx } from 'clsx'
 import gsap from 'gsap'
 
@@ -9,7 +9,7 @@ const MESSAGES = [
   'Almost there…',
 ]
 
-export function GenerateButton({ isLoading, isDisabled, onClick }) {
+export function GenerateButton({ isLoading, isDisabled, onClick, limitReached, onUpgrade }) {
   const btnRef       = useRef(null)
   const progressRef  = useRef(null)
   const [msgIdx, setMsgIdx]     = useState(0)
@@ -41,6 +41,10 @@ export function GenerateButton({ isLoading, isDisabled, onClick }) {
   }, [progress, isLoading])
 
   function handleClick(e) {
+    if (limitReached) {
+      onUpgrade?.()
+      return
+    }
     if (isDisabled || isLoading) return
 
     // GSAP press + ripple
@@ -55,7 +59,7 @@ export function GenerateButton({ isLoading, isDisabled, onClick }) {
     onClick(e)
   }
 
-  const disabled = isDisabled || isLoading
+  const disabled = (isDisabled || isLoading) && !limitReached
 
   return (
     <button
@@ -68,12 +72,14 @@ export function GenerateButton({ isLoading, isDisabled, onClick }) {
         'font-heading font-semibold text-base',
         'transition-all duration-200 select-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
-        disabled
+        limitReached
+          ? 'bg-zinc-800 text-muted cursor-pointer border border-amber/30 hover:border-amber/50'
+          : disabled
           ? 'bg-zinc-800 text-muted cursor-not-allowed border border-border'
-          : 'text-zinc-900 cursor-pointer hover:shadow-[0_0_32px_rgba(245,158,11,0.3)]',
+          : 'text-white cursor-pointer hover:shadow-[0_0_32px_rgba(139,92,246,0.45)]',
       )}
-      style={disabled ? {} : {
-        background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #f59e0b 100%)',
+      style={disabled || limitReached ? {} : {
+        background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #7c3aed 100%)',
         backgroundSize: '200% 100%',
       }}
     >
@@ -90,8 +96,13 @@ export function GenerateButton({ isLoading, isDisabled, onClick }) {
       <span className="relative flex items-center justify-center gap-2.5">
         {isLoading ? (
           <>
-            <span className="w-4 h-4 border-2 border-zinc-900/60 border-t-zinc-900 rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             <span>{MESSAGES[msgIdx]}</span>
+          </>
+        ) : limitReached ? (
+          <>
+            <Lock size={16} className="text-amber" />
+            <span className="text-amber">Limit reached — Upgrade to continue</span>
           </>
         ) : (
           <>
