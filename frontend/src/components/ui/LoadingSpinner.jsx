@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react'
 import gsap from 'gsap'
 
-export function LoadingSpinner({ size = 24, color = '#f59e0b', className = '' }) {
+export function LoadingSpinner({ size = 24, color = '#8b5cf6', className = '' }) {
   const arcRef = useRef(null)
   const containerRef = useRef(null)
 

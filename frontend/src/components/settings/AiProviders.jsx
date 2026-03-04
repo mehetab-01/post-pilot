@@ -21,7 +21,7 @@ export const PROVIDER_META = {
   claude: {
     label: 'Claude (Anthropic)',
     Icon: FaBrain,
-    color: '#f59e0b',
+    color: '#8b5cf6',
     placeholder: 'sk-ant-api03-…',
     models: [
       { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (recommended)' },
@@ -186,7 +186,7 @@ function AddProviderForm({ onAdd, onCancel }) {
           <button
             type="submit"
             disabled={isSaving}
-            className="px-4 py-2 rounded-lg bg-amber text-zinc-900 text-sm font-semibold hover:bg-amber-light transition-colors disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-amber text-white text-sm font-semibold hover:bg-amber-light transition-colors disabled:opacity-50"
           >
             {isSaving ? 'Saving…' : 'Add Provider'}
           </button>
@@ -378,7 +378,7 @@ export function AiProviders() {
         </div>
         <button
           onClick={() => setShowAdd((v) => !v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber text-zinc-900 text-xs font-semibold hover:bg-amber-light transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber text-white text-xs font-semibold hover:bg-amber-light transition-colors"
         >
           <Plus size={13} />
           Add

@@ -55,12 +55,13 @@ export function PublishBar({ generatedPosts, publishResults, onPublishAll, isPub
         className="fixed bottom-0 left-[260px] right-0 z-30 px-8 pb-5 pt-3 pointer-events-none"
       >
         <div
-          className="max-w-[960px] mx-auto flex items-center gap-4 px-5 py-3.5 rounded-2xl border border-border pointer-events-auto"
+          className="max-w-[960px] mx-auto flex items-center gap-4 px-5 py-3.5 rounded-2xl pointer-events-auto"
           style={{
-            background: 'rgba(24,24,27,0.92)',
-            backdropFilter: 'blur(18px)',
-            WebkitBackdropFilter: 'blur(18px)',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+            background: 'rgba(10,10,18,0.9)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(139,92,246,0.18)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(139,92,246,0.08)',
           }}
         >
           {/* Dots */}
@@ -90,14 +91,14 @@ export function PublishBar({ generatedPosts, publishResults, onPublishAll, isPub
             <button
               onClick={onPublishAll}
               disabled={isPublishing}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-zinc-900 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 active:scale-[0.98] flex-shrink-0"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] active:scale-[0.98] flex-shrink-0"
               style={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
               }}
             >
               {isPublishing ? (
                 <>
-                  <span className="w-3.5 h-3.5 border-2 border-zinc-900/50 border-t-zinc-900 rounded-full animate-spin" />
+                  <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   Publishing…
                 </>
               ) : (

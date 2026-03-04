@@ -9,7 +9,7 @@ export const notify = {
   success: (msg) =>
     toast.custom(() => (
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl border bg-surface border-border text-text text-sm shadow-xl shadow-black/40" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <CheckCircle size={18} color="#f59e0b" style={iconStyle} />
+        <CheckCircle size={18} color="#8b5cf6" style={iconStyle} />
         <span>{msg}</span>
       </div>
     )),
@@ -33,7 +33,7 @@ export const notify = {
   warning: (msg) =>
     toast.custom(() => (
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl border bg-surface border-amber/40 text-text text-sm shadow-xl shadow-black/40" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <AlertTriangle size={18} color="#f59e0b" style={iconStyle} />
+        <AlertTriangle size={18} color="#a78bfa" style={iconStyle} />
         <span>{msg}</span>
       </div>
     )),

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle2, XCircle, Loader2, Send, ExternalLink } from 'lucide-react'
 import { PLATFORM_MAP } from './constants'
 
@@ -97,7 +97,7 @@ export function PublishModal({
       {isOpen && (
         <>
           {/* Backdrop */}
-          <motion.div
+          <Motion.div
             key="backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -108,7 +108,7 @@ export function PublishModal({
           />
 
           {/* Panel */}
-          <motion.div
+          <Motion.div
             key="panel"
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -171,9 +171,9 @@ export function PublishModal({
                   <button
                     onClick={onPublishAll}
                     disabled={isPublishing || hasPublished}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-zinc-900 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110 active:scale-[0.98]"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110 active:scale-[0.98]"
                     style={{
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
                     }}
                   >
                     {isPublishing ? (
@@ -191,7 +191,7 @@ export function PublishModal({
                 )}
               </div>
             </div>
-          </motion.div>
+          </Motion.div>
         </>
       )}
     </AnimatePresence>

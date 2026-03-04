@@ -3,9 +3,9 @@ import { LoadingSpinner } from './LoadingSpinner'
 
 const variants = {
   primary:
-    'bg-amber text-zinc-900 font-semibold hover:bg-amber-light active:scale-[0.97] shadow-[0_0_0_0_rgba(245,158,11,0)] hover:shadow-[0_0_16px_rgba(245,158,11,0.25)]',
+    'bg-amber text-white font-semibold hover:bg-amber-light active:scale-[0.97] shadow-[0_0_0_0_rgba(139,92,246,0)] hover:shadow-[0_0_20px_rgba(139,92,246,0.35)]',
   secondary:
-    'bg-surface text-text border border-border hover:bg-zinc-700 hover:border-zinc-600 active:scale-[0.97]',
+    'bg-surface text-text border border-border hover:bg-surface-2 hover:border-border active:scale-[0.97]',
   ghost:
     'text-muted hover:text-text hover:bg-surface active:scale-[0.97]',
   danger:
@@ -47,7 +47,7 @@ export function Button({
       {...props}
     >
       {isLoading ? (
-        <LoadingSpinner size={16} color={variant === 'primary' ? '#09090b' : '#f59e0b'} />
+        <LoadingSpinner size={16} color={variant === 'primary' ? '#ffffff' : '#8b5cf6'} />
       ) : (
         Icon && iconPosition === 'left' && <Icon size={16} />
       )}

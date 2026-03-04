@@ -25,7 +25,7 @@ export function StatusSidebar({ keysData, testResults, oauthConnections = {} }) 
         className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-amber/5 border border-amber/15"
       >
         <div className="flex items-center justify-center w-6 h-6 rounded-lg flex-shrink-0"
-          style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)' }}>
+          style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)' }}>
           <Sparkles size={11} className="text-amber" />
         </div>
         <span className="text-xs text-text font-medium flex-1 min-w-0 truncate">AI Providers</span>

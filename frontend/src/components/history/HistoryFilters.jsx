@@ -32,7 +32,7 @@ function Pill({ active, onClick, children }) {
       className={clsx(
         'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 flex-shrink-0',
         active
-          ? 'bg-amber text-zinc-900'
+          ? 'bg-amber text-white'
           : 'bg-surface border border-border text-muted hover:text-text hover:border-zinc-600',
       )}
     >
