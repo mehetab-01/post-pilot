@@ -507,7 +507,7 @@ def seed_builtin_templates(db: Session) -> None:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=TemplateResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TemplateResponse, status_code=status.HTTP_201_CREATED)
 def create_template(
     payload: TemplateCreate,
     db: Session = Depends(get_db),
@@ -530,7 +530,7 @@ def create_template(
     return tpl
 
 
-@router.get("/", response_model=List[TemplateResponse])
+@router.get("", response_model=List[TemplateResponse])
 def list_templates(
     category: Optional[str] = None,
     tier: Optional[str] = None,
