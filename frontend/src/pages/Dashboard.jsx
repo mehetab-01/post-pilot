@@ -15,7 +15,9 @@ import { PublishModal } from '@/components/dashboard/PublishModal'
 import { TemplateRow } from '@/components/dashboard/TemplateRow'
 import { SaveTemplateModal } from '@/components/dashboard/SaveTemplateModal'
 import { UpgradeModal } from '@/components/dashboard/UpgradeModal'
+import { IdeasPanel } from '@/components/dashboard/IdeasPanel'
 import { generatePosts, postToPlatform } from '@/services/generate'
+import { createScheduledPost } from '@/services/schedule'
 import { getHumanizeScore, getOriginalityScore } from '@/services/analyze'
 import { getConnections } from '@/services/oauth'
 import { useAuth } from '@/contexts/AuthContext'
@@ -87,9 +89,9 @@ export default function Dashboard() {
   const location = useLocation()
   const navigate = useNavigate()
   const {
-    limitReached, isFree, fetchUsage,
+    limitReached, isFree, fetchUsage, plan,
     canHumanize, canOriginality, canDirectPost,
-    isToneLocked, isPlatformLocked,
+    isToneLocked, isPlatformLocked, isPlatformAllowed, requiredPlanFor,
   } = useUsage()
 
   // Pre-fill context when arriving from History "Reuse as template"
@@ -216,13 +218,24 @@ export default function Dashboard() {
   }, [canGenerate, isGenerating, hasGeneratedPosts])
 
   // ────────────────────────────────────────────────────────────────────────────
-  const handleToggle = useCallback((platformId) => {
+  const handleToggle = useCallback((platformId, isLockedClick) => {
+    if (isLockedClick) {
+      const plan = requiredPlanFor(platformId)
+      showUpgrade(`${platformId.charAt(0).toUpperCase() + platformId.slice(1)} (${plan} plan)`)
+      return
+    }
     setSelected((prev) => {
       const already = !!prev[platformId]
       if (already) {
         const next = { ...prev }
         delete next[platformId]
         return next
+      }
+      // Check if platform is allowed by plan tier
+      if (!isPlatformAllowed(platformId)) {
+        const plan = requiredPlanFor(platformId)
+        showUpgrade(`${platformId.charAt(0).toUpperCase() + platformId.slice(1)} (${plan} plan)`)
+        return prev
       }
       // Check free-plan platform limit (max 3)
       const currentCount = Object.keys(prev).filter(k => prev[k]).length
@@ -232,7 +245,7 @@ export default function Dashboard() {
       }
       return { ...prev, [platformId]: { tone: 'professional', options: {}, length: 'medium' } }
     })
-  }, [isPlatformLocked])
+  }, [isPlatformLocked, isPlatformAllowed, requiredPlanFor])
 
   const handleToneChange = useCallback((platformId, tone) => {
     if (isToneLocked(tone)) {
@@ -464,6 +477,40 @@ export default function Dashboard() {
     setIsPublishing(false)
   }
 
+  async function handleScheduleAll(utcIso, timezone) {
+    if (isPublishing) return
+    setIsPublishing(true)
+
+    const platforms = Object.keys(generatedPosts).filter(
+      (p) => generatedPosts[p] && !generatedPosts[p].isLoading && !generatedPosts[p].posted,
+    )
+
+    let ok = 0
+    for (const platform of platforms) {
+      try {
+        const postData = generatedPosts[platform]
+        await createScheduledPost({
+          platform,
+          content: postData.content,
+          scheduled_at: utcIso,
+          timezone,
+          media_ids: mediaFiles.filter(f => f.uploadedId).map(f => f.uploadedId),
+          options: { ...(selectedPlatforms[platform]?.options ?? {}), raw: postData.raw },
+        })
+        ok++
+      } catch (err) {
+        const msg = err?.response?.data?.detail ?? 'Scheduling failed'
+        toast.error(`${platform}: ${msg}`)
+      }
+    }
+
+    if (ok > 0) {
+      toast.success(`${ok} post${ok > 1 ? 's' : ''} scheduled!`)
+    }
+    setIsPublishing(false)
+    setShowPublish(false)
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   return (
     <PageTransition>
@@ -476,7 +523,21 @@ export default function Dashboard() {
 
       {/* Section 1: Context */}
       <div ref={section1Ref} className="mb-8 opacity-0">
-        <SectionLabel>What do you want to post about?</SectionLabel>
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel>What do you want to post about?</SectionLabel>
+          <IdeasPanel
+            niche={context.trim() || undefined}
+            onSelectIdea={(idea) => {
+              setContext(idea.title + ' — ' + idea.description)
+              // Pre-select suggested platforms + tone
+              const newSelected = {}
+              ;(idea.platforms ?? []).forEach((p) => {
+                newSelected[p] = { tone: idea.tone || 'professional', options: {}, length: 'medium' }
+              })
+              if (Object.keys(newSelected).length > 0) setSelected(newSelected)
+            }}
+          />
+        </div>
         <ContextInput value={context} onChange={setContext} />
         <div className="mt-3">
           <MediaUploader files={mediaFiles} onFilesChange={setMediaFiles} />
@@ -497,6 +558,8 @@ export default function Dashboard() {
           onLengthChange={handleLengthChange}
           isToneLocked={isToneLocked}
           isPlatformLocked={isPlatformLocked}
+          isPlatformAllowed={isPlatformAllowed}
+          requiredPlanFor={requiredPlanFor}
           selectedCount={selectedPlatformIds.length}
         />
       </div>
@@ -552,6 +615,9 @@ export default function Dashboard() {
         generatedPosts={generatedPosts}
         publishResults={publishResults}
         onPublishAll={handlePublishAll}
+        onScheduleAll={handleScheduleAll}
+        canSchedule={plan === 'pro'}
+        onUpgrade={() => showUpgrade('Scheduled Posting')}
         isPublishing={isPublishing}
       />
 
