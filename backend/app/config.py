@@ -36,6 +36,11 @@ class Settings:
         "TWITTER_REDIRECT_URI", "http://localhost:8000/api/oauth/twitter/callback"
     )
 
+    # Mastodon (per-instance OAuth — no global client credentials needed)
+    MASTODON_REDIRECT_URI: str = os.getenv(
+        "MASTODON_REDIRECT_URI", "http://localhost:8000/api/oauth/mastodon/callback"
+    )
+
     # Razorpay payments
     RAZORPAY_KEY_ID: str     = os.getenv("RAZORPAY_KEY_ID", "")
     RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")

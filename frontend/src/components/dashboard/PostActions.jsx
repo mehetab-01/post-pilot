@@ -10,7 +10,7 @@ import { regeneratePost, enhancePost, humanizePost, postToPlatform } from '@/ser
 import { PLATFORM_MAP } from './constants'
 
 // Platforms that need an OAuth/key connection to post directly
-const NEEDS_CONNECTION = ['linkedin', 'reddit', 'twitter']
+const NEEDS_CONNECTION = ['linkedin', 'reddit', 'twitter', 'bluesky', 'mastodon']
 
 function ActionBtn({ icon: Icon, label, onClick, color, loading, title, className }) {
   return (

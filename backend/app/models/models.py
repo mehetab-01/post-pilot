@@ -130,3 +130,50 @@ class Payment(Base):
     created_at          = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="payments")
+
+
+class ScheduledPost(Base):
+    __tablename__ = "scheduled_posts"
+
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    user_id       = Column(Integer, ForeignKey("users.id"), nullable=False)
+    platform      = Column(String, nullable=False)
+    content       = Column(Text, nullable=False)
+    media_ids     = Column(JSON, nullable=True)        # list[int]
+    options       = Column(JSON, nullable=True)        # {subreddit, visibility, ...}
+    scheduled_at  = Column(DateTime, nullable=False)   # UTC
+    timezone      = Column(String, nullable=True)      # e.g. "Asia/Kolkata"
+    status        = Column(String, nullable=False, default="pending")  # pending|posting|posted|failed|cancelled
+    error         = Column(Text, nullable=True)
+    post_url      = Column(String, nullable=True)
+    retry_count   = Column(Integer, nullable=False, default=0)
+    post_id       = Column(Integer, ForeignKey("posts.id"), nullable=True)
+    created_at    = Column(DateTime, default=datetime.utcnow)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class IdeaLog(Base):
+    """Tracks daily idea generation usage for rate limiting."""
+    __tablename__ = "idea_logs"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PostMetrics(Base):
+    """Time-series engagement metrics fetched from platform APIs."""
+    __tablename__ = "post_metrics"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    post_id         = Column(Integer, ForeignKey("posts.id"), nullable=False)
+    platform        = Column(String, nullable=False)
+    impressions     = Column(Integer, default=0)
+    likes           = Column(Integer, default=0)
+    shares          = Column(Integer, default=0)
+    comments        = Column(Integer, default=0)
+    clicks          = Column(Integer, default=0)
+    engagement_rate = Column(String, nullable=True)   # stored as string e.g. "4.5"
+    fetched_at      = Column(DateTime, default=datetime.utcnow)
+
+    post = relationship("Post")

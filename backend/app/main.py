@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.database import Base, engine
-from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers, analyze, templates, usage, billing
+from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers, analyze, templates, usage, billing, schedule, ideas, analytics
 
 app = FastAPI(
     title="PostPilot API",
@@ -43,6 +43,9 @@ app.include_router(analyze.router)
 app.include_router(templates.router)
 app.include_router(usage.router)
 app.include_router(billing.router)
+app.include_router(schedule.router)
+app.include_router(ideas.router)
+app.include_router(analytics.router)
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
@@ -93,6 +96,16 @@ def on_startup():
     except Exception:
         pass  # templates table doesn't exist yet — create_all will handle it
 
+    # ── Auto-migrate: add missing columns to social_connections ───────────
+    try:
+        sc_existing = {c["name"] for c in sa_inspect(engine).get_columns("social_connections")}
+        if "instance_url" not in sc_existing:
+            with engine.connect() as conn3:
+                conn3.execute(text("ALTER TABLE social_connections ADD COLUMN instance_url VARCHAR"))
+                conn3.commit()
+    except Exception:
+        pass  # table doesn't exist yet — create_all will handle it
+
     # Ensure upload directory exists
     from app.config import settings as cfg
     os.makedirs(cfg.UPLOAD_DIR, exist_ok=True)
@@ -105,6 +118,10 @@ def on_startup():
         seed_builtin_templates(_db)
     finally:
         _db.close()
+
+    # Start background scheduler for scheduled posts
+    from app.services.scheduler_service import start_scheduler
+    start_scheduler()
 
 
 # ── Frontend static files (production) ───────────────────────────────────────

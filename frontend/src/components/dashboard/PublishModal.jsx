@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { motion as Motion, AnimatePresence } from 'framer-motion'
-import { X, CheckCircle2, XCircle, Loader2, Send, ExternalLink } from 'lucide-react'
+import { X, CheckCircle2, XCircle, Loader2, Send, ExternalLink, Clock, Lock } from 'lucide-react'
 import { PLATFORM_MAP } from './constants'
 
 // ── Platform row ───────────────────────────────────────────────────────────────
@@ -81,8 +82,15 @@ export function PublishModal({
   generatedPosts,
   publishResults,
   onPublishAll,
+  onScheduleAll,
   isPublishing,
+  canSchedule = false,
+  onUpgrade,
 }) {
+  const [mode, setMode] = useState('now') // 'now' | 'schedule'
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleTime, setScheduleTime] = useState('')
+
   const platforms = Object.keys(generatedPosts).filter(
     (p) => generatedPosts[p] && !generatedPosts[p].isLoading,
   )
@@ -91,6 +99,32 @@ export function PublishModal({
   const failCount    = platforms.filter((p) => publishResults?.[p]?.error).length
   const allDone      = postedCount + failCount === platforms.length && platforms.length > 0
   const hasPublished = postedCount > 0
+
+  function handleScheduleToggle() {
+    if (!canSchedule) {
+      onUpgrade?.('Scheduled posting')
+      return
+    }
+    setMode(mode === 'now' ? 'schedule' : 'now')
+  }
+
+  function handleConfirm() {
+    if (mode === 'schedule') {
+      if (!scheduleDate || !scheduleTime) return
+      const localDt = new Date(`${scheduleDate}T${scheduleTime}`)
+      const utcIso = localDt.toISOString()
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      onScheduleAll?.(utcIso, tz)
+    } else {
+      onPublishAll?.()
+    }
+  }
+
+  // Min datetime = 5 min from now
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 5)
+  const minDate = now.toISOString().split('T')[0]
+  const minTime = scheduleDate === minDate ? now.toTimeString().slice(0, 5) : '00:00'
 
   return (
     <AnimatePresence>
@@ -159,36 +193,80 @@ export function PublishModal({
               </div>
 
               {/* Footer */}
-              <div className="flex items-center gap-3 px-5 py-4 border-t border-border">
-                <button
-                  onClick={onClose}
-                  className="flex-1 py-2.5 rounded-xl border border-border text-sm text-muted hover:text-text hover:border-zinc-600 transition-colors"
-                >
-                  {allDone ? 'Close' : 'Cancel'}
-                </button>
-
+              <div className="px-5 py-4 border-t border-border flex flex-col gap-3">
+                {/* Schedule toggle */}
                 {!allDone && (
                   <button
-                    onClick={onPublishAll}
-                    disabled={isPublishing || hasPublished}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110 active:scale-[0.98]"
-                    style={{
-                      background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-                    }}
+                    type="button"
+                    onClick={handleScheduleToggle}
+                    className="flex items-center gap-2 text-xs text-muted hover:text-text transition-colors self-start"
                   >
-                    {isPublishing ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Publishing…
-                      </>
+                    {canSchedule ? (
+                      <Clock size={13} />
                     ) : (
-                      <>
-                        <Send size={14} />
-                        Confirm & Publish
-                      </>
+                      <Lock size={13} />
+                    )}
+                    {mode === 'schedule' ? 'Switch to Publish Now' : 'Schedule for later'}
+                    {!canSchedule && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber/10 text-amber font-semibold">Pro</span>
                     )}
                   </button>
                 )}
+
+                {/* Datetime picker (when schedule mode) */}
+                {mode === 'schedule' && !allDone && (
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={scheduleDate}
+                      min={minDate}
+                      onChange={(e) => setScheduleDate(e.target.value)}
+                      className="flex-1 h-9 bg-bg border border-border rounded-lg px-3 text-sm text-text focus:outline-none focus:border-amber/50"
+                    />
+                    <input
+                      type="time"
+                      value={scheduleTime}
+                      min={minTime}
+                      onChange={(e) => setScheduleTime(e.target.value)}
+                      className="w-28 h-9 bg-bg border border-border rounded-lg px-3 text-sm text-text focus:outline-none focus:border-amber/50"
+                    />
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={onClose}
+                    className="flex-1 py-2.5 rounded-xl border border-border text-sm text-muted hover:text-text hover:border-zinc-600 transition-colors"
+                  >
+                    {allDone ? 'Close' : 'Cancel'}
+                  </button>
+
+                  {!allDone && (
+                    <button
+                      onClick={handleConfirm}
+                      disabled={isPublishing || hasPublished || (mode === 'schedule' && (!scheduleDate || !scheduleTime))}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110 active:scale-[0.98]"
+                      style={{
+                        background: mode === 'schedule'
+                          ? 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
+                          : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+                      }}
+                    >
+                      {isPublishing ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          {mode === 'schedule' ? 'Scheduling…' : 'Publishing…'}
+                        </>
+                      ) : (
+                        <>
+                          {mode === 'schedule' ? <Clock size={14} /> : <Send size={14} />}
+                          {mode === 'schedule' ? 'Schedule Posts' : 'Confirm & Publish'}
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </Motion.div>
