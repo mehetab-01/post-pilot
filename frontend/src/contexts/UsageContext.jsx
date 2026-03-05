@@ -43,9 +43,20 @@ export function UsageProvider({ children }) {
   const canOriginality = features.originality ?? false
   const hasAllTones = features.all_tones ?? false
   const hasAllPlatforms = features.all_platforms ?? false
+  const allowedPlatforms = new Set(usage?.allowed_platforms ?? [
+    'twitter', 'linkedin', 'reddit', 'instagram', 'whatsapp',
+  ])
 
   const isToneLocked = (toneId) => isFree && !FREE_TONES.has(toneId)
   const isPlatformLocked = (selectedCount) => isFree && selectedCount >= 3
+  const isPlatformAllowed = (platformId) => allowedPlatforms.has(platformId)
+
+  // Determine what plan is needed to unlock a given platform
+  const requiredPlanFor = (platformId) => {
+    if (['bluesky', 'mastodon'].includes(platformId)) return 'Starter'
+    if (['threads'].includes(platformId)) return 'Pro'
+    return null
+  }
 
   return (
     <UsageContext.Provider
@@ -53,7 +64,8 @@ export function UsageProvider({ children }) {
         usage, loading, fetchUsage,
         plan, isFree, used, limit, remaining, limitReached, pct, daysUntilReset,
         canDirectPost, canHumanize, canOriginality, hasAllTones, hasAllPlatforms,
-        isToneLocked, isPlatformLocked,
+        isToneLocked, isPlatformLocked, isPlatformAllowed, requiredPlanFor,
+        allowedPlatforms,
       }}
     >
       {children}

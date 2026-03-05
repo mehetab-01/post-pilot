@@ -16,7 +16,8 @@ const PLANS = [
     usd: { monthly: '$6', yearly: '$5' },
     features: [
       '50 generations / month',
-      'All 5 platforms',
+      'All 5 base platforms',
+      'Bluesky + Mastodon posting',
       'All 8 tones',
       'Direct posting',
       'AI Humanizer + Originality',
@@ -33,7 +34,9 @@ const PLANS = [
     features: [
       '200 generations / month',
       'Everything in Starter',
-      'Scheduling (coming soon)',
+      'All platforms (incl. Threads)',
+      'Post scheduling',
+      'Post analytics',
       'Unlimited history',
       'Priority support',
     ],

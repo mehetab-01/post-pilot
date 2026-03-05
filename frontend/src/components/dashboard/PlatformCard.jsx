@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { clsx } from 'clsx'
 import gsap from 'gsap'
+import { Lock } from 'lucide-react'
 import { TONES, TONE_MAP, DEFAULT_TONE } from './constants'
 import { TonePill } from './TonePill'
 import { PlatformOptions } from './PlatformOptions'
@@ -12,7 +13,7 @@ const LENGTH_OPTIONS = [
   { id: 'detailed', label: 'D', title: 'Detailed' },
 ]
 
-export function PlatformCard({ platform, isSelected, selection, onToggle, onToneChange, onOptionChange, onLengthChange, isToneLocked }) {
+export function PlatformCard({ platform, isSelected, selection, onToggle, onToneChange, onOptionChange, onLengthChange, isToneLocked, isLocked, requiredPlan }) {
   const cardRef = useRef(null)
   const { id, label, Icon, color, rgb, desc } = platform
 
@@ -21,6 +22,10 @@ export function PlatformCard({ platform, isSelected, selection, onToggle, onTone
   const options        = selection?.options ?? {}
 
   function handleToggle() {
+    if (isLocked) {
+      onToggle(id, true) // Signal that this is a locked platform click
+      return
+    }
     if (!isSelected) {
       // Pop animation on select
       gsap.fromTo(
@@ -51,30 +56,50 @@ export function PlatformCard({ platform, isSelected, selection, onToggle, onTone
       <div className="flex items-center gap-3 p-4">
         {/* Platform icon */}
         <div
-          className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
+          className="relative flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
           style={isSelected
             ? { background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.3)` }
-            : { background: '#27272a', border: '1px solid #3f3f46' }
+            : isLocked
+              ? { background: '#1c1c1e', border: '1px solid #27272a' }
+              : { background: '#27272a', border: '1px solid #3f3f46' }
           }
         >
-          <Icon size={16} style={{ color: isSelected ? color : '#71717a' }} />
+          <Icon size={16} style={{ color: isLocked ? '#3f3f46' : (isSelected ? color : '#71717a') }} />
+          {isLocked && (
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+              <Lock size={8} className="text-zinc-500" />
+            </div>
+          )}
         </div>
 
         {/* Name + desc */}
         <div className="flex-1 min-w-0">
-          <p className={clsx('text-sm font-medium leading-tight', isSelected ? 'text-heading' : 'text-text')}>
-            {label}
-          </p>
-          <p className="text-xs text-muted">{desc}</p>
+          <div className="flex items-center gap-2">
+            <p className={clsx('text-sm font-medium leading-tight', isLocked ? 'text-zinc-500' : isSelected ? 'text-heading' : 'text-text')}>
+              {label}
+            </p>
+            {isLocked && requiredPlan && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide"
+                style={{
+                  background: requiredPlan === 'Pro' ? 'rgba(245,158,11,0.12)' : 'rgba(139,92,246,0.12)',
+                  color: requiredPlan === 'Pro' ? '#f59e0b' : '#a78bfa',
+                  border: `1px solid ${requiredPlan === 'Pro' ? 'rgba(245,158,11,0.25)' : 'rgba(139,92,246,0.25)'}`,
+                }}
+              >
+                {requiredPlan}
+              </span>
+            )}
+          </div>
+          <p className={clsx('text-xs', isLocked ? 'text-zinc-600' : 'text-muted')}>{desc}</p>
         </div>
 
         {/* Selection indicator */}
         <div
           className={clsx(
             'w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all duration-200',
-            isSelected ? 'border-transparent' : 'border-zinc-600',
+            isLocked ? 'border-zinc-700' : isSelected ? 'border-transparent' : 'border-zinc-600',
           )}
-          style={isSelected ? { background: color } : {}}
+          style={isSelected && !isLocked ? { background: color } : {}}
         />
       </div>
 

@@ -10,11 +10,16 @@ from sqlalchemy.orm import Session
 
 # ── Plan definitions ──────────────────────────────────────────────────────────
 
+_BASE_PLATFORMS = ["twitter", "linkedin", "reddit", "instagram", "whatsapp"]
+_STARTER_PLATFORMS = _BASE_PLATFORMS + ["bluesky", "mastodon"]
+_PRO_PLATFORMS = _STARTER_PLATFORMS + ["threads"]
+
 PLAN_CONFIG = {
     "free": {
         "generations_limit": 10,
         "max_platforms": 3,
         "allowed_tones": {"professional", "casual", "educational"},
+        "allowed_platforms": _BASE_PLATFORMS,
         "direct_posting": False,
         "humanizer": False,
         "originality": False,
@@ -27,6 +32,7 @@ PLAN_CONFIG = {
         "generations_limit": 50,
         "max_platforms": 99,
         "allowed_tones": None,       # all tones
+        "allowed_platforms": _STARTER_PLATFORMS,
         "direct_posting": True,
         "humanizer": True,
         "originality": True,
@@ -39,6 +45,7 @@ PLAN_CONFIG = {
         "generations_limit": 200,
         "max_platforms": 99,
         "allowed_tones": None,
+        "allowed_platforms": _PRO_PLATFORMS,
         "direct_posting": True,
         "humanizer": True,
         "originality": True,
@@ -182,6 +189,29 @@ def check_tone_allowed(user, platforms: dict) -> None:
             )
 
 
+def check_platform_allowed(user, platforms: dict) -> None:
+    """Raise 403 if any requested platform is not in the user's plan tier."""
+    cfg = get_plan_config(user.plan or "free")
+    allowed = set(cfg["allowed_platforms"])
+    for platform in platforms:
+        if platform not in allowed:
+            # Determine minimum required plan
+            min_plan = "starter"
+            if platform in ("threads",):
+                min_plan = "pro"
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "platform_locked",
+                    "message": f"{platform.capitalize()} requires a {min_plan.title()} plan or higher.",
+                    "current_plan": user.plan or "free",
+                    "required_plan": min_plan,
+                    "locked_platform": platform,
+                    "upgrade_url": "/pricing",
+                },
+            )
+
+
 def require_plan(user, minimum: str, feature_name: str) -> None:
     """Ensure user is on at least `minimum` plan (starter or pro)."""
     order = {"free": 0, "starter": 1, "pro": 2}
@@ -216,4 +246,5 @@ def build_usage_response(user, db: Session) -> dict:
             "all_platforms": cfg["all_platforms"],
             "scheduling": cfg["scheduling"],
         },
+        "allowed_platforms": cfg["allowed_platforms"],
     }
