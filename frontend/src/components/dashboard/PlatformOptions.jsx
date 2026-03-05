@@ -30,21 +30,76 @@ export function PlatformOptions({ platform, options, onChange }) {
 
   if (platform === 'twitter') {
     return (
-      <Toggle
-        label="Thread mode"
-        checked={!!options.thread}
-        onChange={(v) => set('thread', v)}
-      />
+      <div className="flex flex-col gap-3">
+        <Toggle
+          label="Thread mode"
+          checked={!!options.thread}
+          onChange={(v) => set('thread', v)}
+        />
+        {options.thread && (
+          <div>
+            <label className="text-xs font-medium text-muted block mb-1.5">
+              Number of tweets ({options.thread_count || 3})
+            </label>
+            <input
+              type="range"
+              min={2}
+              max={10}
+              value={options.thread_count || 3}
+              onChange={(e) => set('thread_count', parseInt(e.target.value, 10))}
+              className="w-full accent-amber"
+            />
+            <div className="flex justify-between text-[10px] text-muted mt-0.5">
+              <span>2</span>
+              <span>10</span>
+            </div>
+          </div>
+        )}
+      </div>
     )
   }
 
   if (platform === 'linkedin') {
     return (
-      <Toggle
-        label="Include call-to-action"
-        checked={options.cta !== false}
-        onChange={(v) => set('cta', v)}
-      />
+      <div className="flex flex-col gap-3">
+        <Toggle
+          label="Include call-to-action"
+          checked={options.cta !== false}
+          onChange={(v) => set('cta', v)}
+        />
+        {options.cta !== false && (
+          <>
+            <div>
+              <label className="text-xs font-medium text-muted block mb-1.5">CTA text</label>
+              <input
+                type="text"
+                value={options.cta_text || ''}
+                onChange={(e) => set('cta_text', e.target.value)}
+                placeholder="e.g. Sign up for our free trial"
+                className={clsx(
+                  'w-full h-9 bg-bg border border-border rounded-lg px-3 text-sm text-text',
+                  'placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-amber/40 focus:border-amber',
+                  'hover:border-zinc-600 transition-colors',
+                )}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted block mb-1.5">CTA link</label>
+              <input
+                type="url"
+                value={options.cta_link || ''}
+                onChange={(e) => set('cta_link', e.target.value)}
+                placeholder="https://example.com/signup"
+                className={clsx(
+                  'w-full h-9 bg-bg border border-border rounded-lg px-3 text-sm text-text',
+                  'placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-amber/40 focus:border-amber',
+                  'hover:border-zinc-600 transition-colors',
+                )}
+              />
+            </div>
+          </>
+        )}
+      </div>
     )
   }
 
@@ -73,6 +128,27 @@ export function PlatformOptions({ platform, options, onChange }) {
             'hover:border-zinc-600 transition-colors',
           )}
         />
+      </div>
+    )
+  }
+
+  if (platform === 'mastodon') {
+    return (
+      <div>
+        <label className="text-xs font-medium text-muted block mb-1.5">Visibility</label>
+        <select
+          value={options.visibility || 'public'}
+          onChange={(e) => set('visibility', e.target.value)}
+          className={clsx(
+            'w-full h-9 bg-bg border border-border rounded-lg px-3 text-sm text-text',
+            'focus:outline-none focus:ring-2 focus:ring-amber/40 focus:border-amber',
+            'hover:border-zinc-600 transition-colors',
+          )}
+        >
+          <option value="public">Public</option>
+          <option value="unlisted">Unlisted</option>
+          <option value="private">Followers only</option>
+        </select>
       </div>
     )
   }

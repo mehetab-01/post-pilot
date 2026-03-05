@@ -19,7 +19,7 @@ X/Twitter (max 280 chars per tweet):
 - Start with a bold hook or unexpected statement
 - Short punchy sentences
 - 1-3 relevant hashtags max
-- If thread mode: tweet 1 = hook, middle tweets = value/story, last = CTA
+- If thread=True and thread_count=N: generate exactly N tweets. tweet 1 = hook, middle tweets = value/story, last tweet = CTA or wrap-up. Each tweet must be ≤280 chars.
 - Use line breaks between thoughts
 
 LinkedIn — STRICT STRUCTURE REQUIRED:
@@ -33,7 +33,7 @@ Every LinkedIn post MUST follow this exact structure with blank lines between ea
 
 [1-2 lines of key takeaway or reflection]
 
-[CTA question to spark comments — start with "What do you think?" or similar]
+[CTA — if cta_link is provided: end with a clear call-to-action incorporating the link, e.g. "👉 {cta_text}: {cta_link}". If no cta_link: question to spark comments like "What do you think?"]
 
 [3-5 hashtags on final line]
 
@@ -58,6 +58,23 @@ WhatsApp (short & personal):
 - Casual tone like texting a close friend
 - Relevant emojis sprinkled naturally
 - No hashtags ever
+
+Bluesky (max 300 chars):
+- Concise, conversational, community-oriented
+- 1-3 relevant hashtags max (use # inline, no separate block)
+- Avoid corporate speak — more indie/open-web vibe
+- No markdown bold/italic (plain text only)
+- Can mention users with @handle.bsky.social
+- Good use of wit, brevity, and personality
+
+Mastodon (max 500 chars):
+- Community-focused, thoughtful, longer-form micro-posts
+- Use content warning (CW) if topic is sensitive — put CW text in "cw" field
+- Hashtags are important for discovery (no algorithmic feed) — 3-5 relevant tags
+- Plain text only, no markdown
+- More conversational and less "brand" voice
+- Can be more nuanced/detailed than Twitter
+- Avoid engagement bait — Mastodon culture values authenticity
 
 TONE DEFINITIONS:
 
@@ -103,6 +120,19 @@ RESPOND IN VALID JSON ONLY (no markdown, no backticks, just raw JSON):
       "content": "message text",
       "char_count": 300,
       "media_suggestion": "Attach image before text"
+    },
+    "bluesky": {
+      "content": "post text",
+      "hashtags": ["tag1", "tag2"],
+      "char_count": 280,
+      "media_suggestion": "Attach image to post"
+    },
+    "mastodon": {
+      "content": "post text",
+      "cw": null,
+      "hashtags": ["tag1", "tag2"],
+      "char_count": 450,
+      "media_suggestion": "Attach image to post"
     }
   },
   "posting_tips": {
@@ -118,17 +148,23 @@ _LENGTH_GUIDE = {
     "short": (
         "LENGTH: Keep posts SHORT and punchy. "
         "Twitter: 1-2 sentences. LinkedIn: 300-500 chars, 3-4 sections max. "
-        "Reddit body: 2-3 paragraphs. Instagram: 3-4 lines + hashtags."
+        "Reddit body: 2-3 paragraphs. Instagram: 3-4 lines + hashtags. "
+        "Bluesky: 1-2 sentences under 200 chars. "
+        "Mastodon: 2-3 sentences, ~250 chars."
     ),
     "medium": (
         "LENGTH: Use MEDIUM length — balanced and complete. "
         "Twitter: 2-3 sentences. LinkedIn: 700-1000 chars, full structure. "
-        "Reddit body: 4-6 paragraphs. Instagram: 6-8 lines + hashtags."
+        "Reddit body: 4-6 paragraphs. Instagram: 6-8 lines + hashtags. "
+        "Bluesky: 2-3 sentences, ~250 chars. "
+        "Mastodon: 3-4 sentences, ~400 chars."
     ),
     "detailed": (
         "LENGTH: Write DETAILED and comprehensive posts. "
         "Twitter: thread preferred, each tweet maxed. LinkedIn: 1100-1500 chars, rich structure with examples. "
-        "Reddit body: thorough, 6+ paragraphs with depth. Instagram: full caption near 2000 chars."
+        "Reddit body: thorough, 6+ paragraphs with depth. Instagram: full caption near 2000 chars. "
+        "Bluesky: use full 300 chars with detail. "
+        "Mastodon: use full 500 chars with nuance."
     ),
 }
 
@@ -377,6 +413,56 @@ async def check_originality(
         return json.loads(raw)
     except json.JSONDecodeError:
         return {"originality_score": 55, "level": "mixed", "generic_phrases": [], "improvements": [], "verdict": ""}
+
+
+async def generate_ideas(
+    api_key: str,
+    niche: str | None = None,
+    platforms: list[str] | None = None,
+    recent_contexts: list[str] | None = None,
+    model: str = "claude-sonnet-4-20250514",
+) -> list[dict]:
+    """Generate 5-8 post topic suggestions."""
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+
+    parts = [
+        "You are an expert social media content strategist. Generate 6 unique, creative post ideas.",
+        "Each idea should be specific, timely, and actionable — not generic.",
+    ]
+    if niche:
+        parts.append(f"User's niche/industry: {niche}")
+    if platforms:
+        parts.append(f"Preferred platforms: {', '.join(platforms)}")
+    if recent_contexts:
+        parts.append("Recent posts (avoid repetition):")
+        for ctx in recent_contexts[:5]:
+            parts.append(f"  - {ctx[:120]}")
+
+    parts.append(
+        "\nReturn a JSON array of 6 objects, each with:\n"
+        '  - "title": short catchy title (max 60 chars)\n'
+        '  - "description": one-line description of what to write about (max 120 chars)\n'
+        '  - "platforms": array of 1-3 best platforms for this idea (twitter, linkedin, reddit, instagram, bluesky, mastodon)\n'
+        '  - "tone": suggested tone (professional, casual, hype, storytelling, educational, witty, inspirational, bold)\n'
+        "\nReturn ONLY the JSON array, no extra text."
+    )
+
+    message = await client.messages.create(
+        model=model,
+        max_tokens=2048,
+        messages=[{"role": "user", "content": "\n".join(parts)}],
+    )
+
+    raw = message.content[0].text.strip()
+    # Strip markdown fences if present
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+    if raw.endswith("```"):
+        raw = raw[:-3]
+    raw = raw.strip()
+
+    import json as _json
+    return _json.loads(raw)
 
 
 async def humanize_post(

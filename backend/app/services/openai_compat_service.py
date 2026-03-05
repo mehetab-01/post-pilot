@@ -174,3 +174,46 @@ async def check_originality(
         return json.loads(raw)
     except json.JSONDecodeError:
         return {"originality_score": 55, "level": "mixed", "generic_phrases": [], "improvements": [], "verdict": ""}
+
+
+async def generate_ideas(
+    api_key: str,
+    model: str,
+    provider: str,
+    niche: str | None = None,
+    platforms: list[str] | None = None,
+    recent_contexts: list[str] | None = None,
+) -> list[dict]:
+    """Generate 6 post ideas using an OpenAI-compatible provider."""
+    client = _get_client(provider, api_key)
+
+    parts = [
+        "You are an expert social media content strategist. Generate 6 unique, creative post ideas.",
+        "Each idea should be specific, timely, and actionable — not generic.",
+    ]
+    if niche:
+        parts.append(f"User's niche/industry: {niche}")
+    if platforms:
+        parts.append(f"Preferred platforms: {', '.join(platforms)}")
+    if recent_contexts:
+        parts.append("Recent posts (avoid repetition):")
+        for ctx in recent_contexts[:5]:
+            parts.append(f"  - {ctx[:120]}")
+
+    parts.append(
+        "\nReturn a JSON array of 6 objects, each with:\n"
+        '  - "title": short catchy title (max 60 chars)\n'
+        '  - "description": one-line description of what to write about (max 120 chars)\n'
+        '  - "platforms": array of 1-3 best platforms for this idea (twitter, linkedin, reddit, instagram, bluesky, mastodon)\n'
+        '  - "tone": suggested tone (professional, casual, hype, storytelling, educational, witty, inspirational, bold)\n'
+        "\nReturn ONLY the JSON array, no extra text."
+    )
+
+    resp = await client.chat.completions.create(
+        model=model,
+        max_tokens=2048,
+        messages=[{"role": "user", "content": "\n".join(parts)}],
+    )
+
+    raw = _strip_json_fences(resp.choices[0].message.content or "")
+    return json.loads(raw)

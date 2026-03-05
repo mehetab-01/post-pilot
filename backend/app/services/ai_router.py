@@ -200,3 +200,35 @@ async def humanize_post(
             continue
 
     raise ValueError(f"All AI providers failed. Last error: {last_err}")
+
+
+async def generate_ideas(
+    db: Session,
+    user_id: int,
+    niche: Optional[str] = None,
+    platforms: Optional[list[str]] = None,
+    recent_contexts: Optional[list[str]] = None,
+) -> list[dict]:
+    providers = _get_providers(db, user_id)
+    if not providers:
+        raise ValueError("No AI providers configured.")
+
+    last_err: Exception = Exception("Unknown error")
+    for p in providers:
+        try:
+            key = decrypt_value(p.encrypted_key)
+            if p.provider == "claude":
+                return await claude_service.generate_ideas(
+                    api_key=key, model=p.model,
+                    niche=niche, platforms=platforms, recent_contexts=recent_contexts,
+                )
+            else:
+                return await openai_compat_service.generate_ideas(
+                    api_key=key, model=p.model, provider=p.provider,
+                    niche=niche, platforms=platforms, recent_contexts=recent_contexts,
+                )
+        except Exception as exc:
+            last_err = exc
+            continue
+
+    raise ValueError(f"All AI providers failed. Last error: {last_err}")

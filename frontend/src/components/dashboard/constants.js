@@ -1,4 +1,4 @@
-import { FaXTwitter, FaLinkedinIn, FaRedditAlien, FaInstagram, FaWhatsapp } from 'react-icons/fa6'
+import { FaXTwitter, FaLinkedinIn, FaRedditAlien, FaInstagram, FaWhatsapp, FaBluesky, FaMastodon } from 'react-icons/fa6'
 import {
   Briefcase, Coffee, Flame, BookOpen, GraduationCap, Smile, Sparkles, Target,
 } from 'lucide-react'
@@ -48,6 +48,24 @@ export const PLATFORMS = [
     rgb:   '37,211,102',
     limit: 1000,
     desc:  'short & personal',
+  },
+  {
+    id:    'bluesky',
+    label: 'Bluesky',
+    Icon:  FaBluesky,
+    color: '#0085ff',
+    rgb:   '0,133,255',
+    limit: 300,
+    desc:  '300 chars',
+  },
+  {
+    id:    'mastodon',
+    label: 'Mastodon',
+    Icon:  FaMastodon,
+    color: '#6364ff',
+    rgb:   '99,100,255',
+    limit: 500,
+    desc:  '500 chars',
   },
 ]
 

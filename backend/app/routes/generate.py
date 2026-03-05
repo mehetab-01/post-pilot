@@ -17,7 +17,7 @@ from app.schemas.schemas import (
     RegenerateRequest,
     RegenerateResponse,
 )
-from app.plans import check_generation_limit, check_platform_limit, check_tone_allowed, increment_generation, require_plan
+from app.plans import check_generation_limit, check_platform_allowed, check_platform_limit, check_tone_allowed, increment_generation, require_plan
 from app.security import get_current_user
 from app.services import ai_router
 
@@ -49,8 +49,16 @@ async def generate(
 
     # ── Plan gating ───────────────────────────────────────────────────────
     check_generation_limit(current_user, db)
+    check_platform_allowed(current_user, payload.platforms)
     check_platform_limit(current_user, payload.platforms)
     check_tone_allowed(current_user, payload.platforms)
+
+    # ── Normalize options ─────────────────────────────────────────────────
+    twitter_opts = payload.platforms.get("twitter", {})
+    if twitter_opts.get("thread"):
+        tc = twitter_opts.get("thread_count", 3)
+        twitter_opts["thread_count"] = max(2, min(10, int(tc)))
+        payload.platforms["twitter"] = twitter_opts
 
     try:
         result = await ai_router.generate_posts(
@@ -117,6 +125,7 @@ async def regenerate(
 
     # ── Plan gating ───────────────────────────────────────────────────────
     check_generation_limit(current_user, db)
+    check_platform_allowed(current_user, {payload.platform: platform_options})
     check_tone_allowed(current_user, {payload.platform: platform_options})
 
     try:
