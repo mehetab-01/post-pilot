@@ -9,6 +9,14 @@ import { OriginalityScore } from './OriginalityScore'
 import { Badge } from '@/components/ui/Badge'
 import { humanizePost } from '@/services/generate'
 
+import { TwitterPreview } from './previews/TwitterPreview'
+import { LinkedInPreview } from './previews/LinkedInPreview'
+import { RedditPreview } from './previews/RedditPreview'
+import { InstagramPreview } from './previews/InstagramPreview'
+import { WhatsAppPreview } from './previews/WhatsAppPreview'
+import { BlueskyPreview } from './previews/BlueskyPreview'
+import { MastodonPreview } from './previews/MastodonPreview'
+
 // ── Char count indicator ──────────────────────────────────────────────────────
 function CharCount({ count, limit }) {
   const pct = limit > 0 ? count / limit : 0
@@ -33,95 +41,18 @@ function Shimmer() {
 }
 
 // ── Platform-specific content renderers ──────────────────────────────────────
-function TwitterContent({ raw, content }) {
-  const threads = raw?.thread ?? []
-  if (threads.length > 1) {
-    return (
-      <div className="flex flex-col gap-3">
-        {threads.map((tweet, i) => (
-          <div key={i} className="flex gap-2.5">
-            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-              <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center text-xs text-muted font-mono">
-                {i + 1}
-              </div>
-              {i < threads.length - 1 && <div className="w-px flex-1 bg-border" />}
-            </div>
-            <p className="text-sm text-text leading-relaxed pt-1 pb-2">{tweet}</p>
-          </div>
-        ))}
-      </div>
-    )
-  }
-  return <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{content}</p>
-}
-
-function LinkedInContent({ raw, content }) {
-  // Dim hashtags
-  const parts = content.split(/(#\w+)/g)
-  return (
-    <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">
-      {parts.map((part, i) =>
-        part.startsWith('#')
-          ? <span key={i} className="text-linkedin">{part}</span>
-          : part
-      )}
-    </p>
-  )
-}
-
-function RedditContent({ raw, content }) {
-  const title = raw?.title ?? content.split('\n')[0]
-  const body  = raw?.content ?? content.split('\n').slice(1).join('\n').trim()
-  const subs  = raw?.subreddits ?? []
-
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm font-semibold text-heading leading-snug">{title}</p>
-      {body && <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{body}</p>}
-      {subs.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {subs.map((s) => (
-            <Badge key={s} variant="reddit">{s}</Badge>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function InstagramContent({ raw, content }) {
-  const hashtags = (raw?.hashtags ?? []).map((h) => (h.startsWith('#') ? h : `#${h}`))
-  const mainText = content.replace(/(#\w+\s*)+$/g, '').trim()
-
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{mainText}</p>
-      {hashtags.length > 0 && (
-        <p className="text-xs text-muted leading-relaxed">
-          {hashtags.join(' ')}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function WhatsAppContent({ content }) {
-  return (
-    <div className="inline-block max-w-full">
-      <div className="bg-zinc-800 rounded-[18px] rounded-tl-sm px-4 py-3 text-sm text-text leading-relaxed whitespace-pre-wrap">
-        {content}
-      </div>
-    </div>
-  )
-}
-
 function PlatformContent({ platform, raw, content }) {
-  if (platform === 'twitter')   return <TwitterContent   raw={raw} content={content} />
-  if (platform === 'linkedin')  return <LinkedInContent  raw={raw} content={content} />
-  if (platform === 'reddit')    return <RedditContent    raw={raw} content={content} />
-  if (platform === 'instagram') return <InstagramContent raw={raw} content={content} />
-  if (platform === 'whatsapp')  return <WhatsAppContent  content={content} />
-  return <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{content}</p>
+  switch (platform) {
+    case 'twitter':   return <TwitterPreview   raw={raw} content={content} />
+    case 'linkedin':  return <LinkedInPreview  raw={raw} content={content} />
+    case 'reddit':    return <RedditPreview    raw={raw} content={content} />
+    case 'instagram': return <InstagramPreview raw={raw} content={content} />
+    case 'whatsapp':  return <WhatsAppPreview  content={content} />
+    case 'bluesky':   return <BlueskyPreview   content={content} />
+    case 'mastodon':  return <MastodonPreview  content={content} />
+    default:
+      return <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{content}</p>
+  }
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
