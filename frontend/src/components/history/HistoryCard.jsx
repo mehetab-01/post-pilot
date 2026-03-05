@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   ExternalLink, ChevronDown, MoreHorizontal, Copy, RefreshCw, Trash2, Check, Eye,
+  Heart, Share2, MessageCircle,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { clsx } from 'clsx'
@@ -282,6 +283,18 @@ export function HistoryCard({ item, onDeleted }) {
                 <ExternalLink size={10} />
                 View post
               </a>
+            )}
+
+            {/* Inline engagement metrics */}
+            {item.metrics && (
+              <span className="flex items-center gap-2.5 text-[11px] text-muted ml-1">
+                <span className="flex items-center gap-0.5"><Heart size={10} className="text-pink-400" />{item.metrics.likes}</span>
+                <span className="flex items-center gap-0.5"><Share2 size={10} className="text-blue-400" />{item.metrics.shares}</span>
+                <span className="flex items-center gap-0.5"><MessageCircle size={10} className="text-emerald-400" />{item.metrics.comments}</span>
+                {item.metrics.impressions > 0 && (
+                  <span className="flex items-center gap-0.5"><Eye size={10} />{item.metrics.impressions}</span>
+                )}
+              </span>
             )}
 
             {/* Loading indicator for expand */}

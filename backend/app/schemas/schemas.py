@@ -241,6 +241,7 @@ class HistoryItem(BaseModel):
     posted: bool
     post_url: Optional[str] = None
     created_at: datetime
+    metrics: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -289,6 +290,38 @@ class TemplateResponse(BaseModel):
     preview_example: Optional[str] = None
     icon: Optional[str] = None
     color: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Scheduled Posts ───────────────────────────────────────────────────────────
+
+class SchedulePostRequest(BaseModel):
+    platform: str
+    content: str
+    scheduled_at: datetime           # UTC ISO 8601
+    timezone: Optional[str] = None   # e.g. "Asia/Kolkata"
+    media_ids: Optional[List[int]] = None
+    options: Dict[str, Any] = {}
+    post_id: Optional[int] = None
+
+
+class RescheduleRequest(BaseModel):
+    scheduled_at: datetime
+
+
+class ScheduledPostResponse(BaseModel):
+    id: int
+    platform: str
+    content: str
+    scheduled_at: datetime
+    timezone: Optional[str] = None
+    status: str
+    error: Optional[str] = None
+    post_url: Optional[str] = None
+    retry_count: int
+    created_at: datetime
 
     class Config:
         from_attributes = True

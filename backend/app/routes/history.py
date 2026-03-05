@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.models import Post, User
+from app.models.models import Post, PostMetrics, User
 from app.schemas.schemas import HistoryItem, HistoryResponse, PostResponse
 from app.security import get_current_user
 
@@ -18,7 +18,7 @@ def _make_preview(post: Post) -> str:
 
 @router.get("", response_model=HistoryResponse)
 def list_history(
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -34,18 +34,44 @@ def list_history(
         .all()
     )
 
-    items = [
-        HistoryItem(
-            id=p.id,
-            platform=p.platform,
-            tone=p.tone,
-            content_preview=_make_preview(p),
-            posted=p.posted,
-            post_url=p.post_url,
-            created_at=p.created_at,
+    items = []
+    posted_ids = [p.id for p in posts if p.posted]
+    metrics_map = {}
+    if posted_ids:
+        from sqlalchemy import func
+        latest = (
+            db.query(PostMetrics.post_id, func.max(PostMetrics.fetched_at).label("latest"))
+            .filter(PostMetrics.post_id.in_(posted_ids))
+            .group_by(PostMetrics.post_id)
+            .subquery()
         )
-        for p in posts
-    ]
+        rows = (
+            db.query(PostMetrics)
+            .join(latest, (PostMetrics.post_id == latest.c.post_id) & (PostMetrics.fetched_at == latest.c.latest))
+            .all()
+        )
+        for m in rows:
+            metrics_map[m.post_id] = {
+                "impressions": m.impressions,
+                "likes": m.likes,
+                "shares": m.shares,
+                "comments": m.comments,
+                "engagement_rate": m.engagement_rate,
+            }
+
+    for p in posts:
+        items.append(
+            HistoryItem(
+                id=p.id,
+                platform=p.platform,
+                tone=p.tone,
+                content_preview=_make_preview(p),
+                posted=p.posted,
+                post_url=p.post_url,
+                created_at=p.created_at,
+                metrics=metrics_map.get(p.id),
+            )
+        )
 
     return HistoryResponse(items=items, total=total, limit=limit, offset=offset)
 
