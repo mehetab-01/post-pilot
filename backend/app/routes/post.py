@@ -14,7 +14,7 @@ from app.schemas.schemas import (
     PostToPlatformRequest,
 )
 from app.security import get_current_user
-from app.services import linkedin_service, reddit_service, twitter_service
+from app.services import linkedin_service, reddit_service, twitter_service, bluesky_service, mastodon_service
 from app.services.encryption import decrypt_value
 from app.plans import require_plan
 
@@ -160,6 +160,24 @@ def _do_post(
                 )
             result_data = _post_reddit(conn, payload, media_paths)
 
+        elif platform == "bluesky":
+            conn = _get_social_connection(db, current_user.id, "bluesky")
+            if not conn or not conn.access_token_enc:
+                return PlatformPostResult(
+                    platform=platform, success=False,
+                    error="Bluesky not connected. Add your handle & app password in Settings.",
+                )
+            result_data = _post_bluesky(conn, payload, media_paths)
+
+        elif platform == "mastodon":
+            conn = _get_social_connection(db, current_user.id, "mastodon")
+            if not conn or not conn.access_token_enc or not conn.instance_url:
+                return PlatformPostResult(
+                    platform=platform, success=False,
+                    error="Mastodon not connected. Click 'Connect with Mastodon' in Settings.",
+                )
+            result_data = _post_mastodon(conn, payload, media_paths)
+
         elif platform in ("instagram", "whatsapp"):
             return PlatformPostResult(
                 platform=platform, success=False,
@@ -246,4 +264,25 @@ def _post_reddit(conn: SocialConnection, payload: PostToPlatformRequest, media_p
         title=title,
         content=payload.content,
         media_path=media_path,
+    )
+
+
+def _post_bluesky(conn: SocialConnection, payload: PostToPlatformRequest, media_paths: list[str]) -> dict:
+    session_string = decrypt_value(conn.access_token_enc)
+    return bluesky_service.post_to_bluesky(
+        session_string=session_string,
+        content=payload.content,
+        media_paths=media_paths or None,
+    )
+
+
+def _post_mastodon(conn: SocialConnection, payload: PostToPlatformRequest, media_paths: list[str]) -> dict:
+    access_token = decrypt_value(conn.access_token_enc)
+    visibility = payload.options.get("visibility", "public")
+    return mastodon_service.post_to_mastodon(
+        instance_url=conn.instance_url,
+        access_token=access_token,
+        content=payload.content,
+        media_paths=media_paths or None,
+        visibility=visibility,
     )

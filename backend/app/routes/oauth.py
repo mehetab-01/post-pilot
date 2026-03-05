@@ -26,18 +26,20 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from jose import JWTError, jwt
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models.social_connection import SocialConnection
+from app.models.social_connection import SocialConnection, MastodonApp
 from app.models.models import User
 from app.security import get_current_user
 from app.services.encryption import encrypt_value, decrypt_value
+from app.services import mastodon_service
 
 router = APIRouter(prefix="/api/oauth", tags=["oauth"])
 
-ALLOWED_PLATFORMS = ("linkedin", "reddit", "twitter")
+ALLOWED_PLATFORMS = ("linkedin", "reddit", "twitter", "bluesky", "mastodon")
 
 # ── State helpers ─────────────────────────────────────────────────────────────
 
@@ -283,6 +285,8 @@ def authorize(
     """Return the OAuth authorization URL for the given platform."""
     if platform not in ALLOWED_PLATFORMS:
         raise HTTPException(status_code=400, detail=f"Unsupported platform: {platform}")
+    if platform in ("bluesky", "mastodon"):
+        raise HTTPException(status_code=400, detail=f"{platform} uses a dedicated connect endpoint")
 
     if platform == "linkedin":
         state = _create_state(current_user.id)
@@ -397,3 +401,153 @@ def disconnect(
     db.delete(conn)
     db.commit()
     return {"success": True, "platform": platform}
+
+
+# ── Bluesky (App Password auth — not OAuth) ──────────────────────────────────
+
+class BlueskyConnectRequest(BaseModel):
+    handle: str
+    app_password: str
+
+
+@router.post("/bluesky/connect")
+def bluesky_connect(
+    payload: BlueskyConnectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Authenticate with Bluesky using handle + app password, store session."""
+    from app.services.bluesky_service import login_and_export
+
+    try:
+        session_data = login_and_export(payload.handle.strip(), payload.app_password.strip())
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Bluesky login failed: {exc}",
+        )
+
+    # Upsert SocialConnection
+    conn = (
+        db.query(SocialConnection)
+        .filter(SocialConnection.user_id == current_user.id, SocialConnection.platform == "bluesky")
+        .first()
+    )
+    if not conn:
+        conn = SocialConnection(user_id=current_user.id, platform="bluesky")
+        db.add(conn)
+
+    conn.access_token_enc = encrypt_value(session_data["session_string"])
+    conn.refresh_token_enc = None
+    conn.username = session_data["username"]
+    conn.expires_at = None  # Session doesn't have a fixed expiry
+    conn.connected_at = datetime.utcnow()
+    db.commit()
+
+    return {
+        "success": True,
+        "username": session_data["username"],
+        "platform": "bluesky",
+    }
+
+
+# ── Mastodon — per-instance OAuth ─────────────────────────────────────────────
+
+class MastodonAuthorizeRequest(BaseModel):
+    instance_url: str          # e.g. "mastodon.social"
+
+
+def _get_or_create_mastodon_app(db: Session, instance_url: str) -> MastodonApp:
+    """Return cached MastodonApp or register a new one."""
+    instance_url = instance_url.strip().lower().rstrip("/")
+    app = db.query(MastodonApp).filter(MastodonApp.instance_url == instance_url).first()
+    if app:
+        return app
+
+    from app.config import settings as cfg
+    client_id, client_secret = mastodon_service.register_app(instance_url, cfg.MASTODON_REDIRECT_URI)
+
+    app = MastodonApp(
+        instance_url=instance_url,
+        client_id=client_id,
+        client_secret=client_secret,
+    )
+    db.add(app)
+    db.commit()
+    db.refresh(app)
+    return app
+
+
+@router.post("/mastodon/authorize")
+def mastodon_authorize(
+    payload: MastodonAuthorizeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Register app on user's instance (if first time), return authorize URL.
+    State JWT carries user_id + instance_url so callback knows which instance.
+    """
+    from app.config import settings as cfg
+
+    instance_url = payload.instance_url.strip().lower().rstrip("/")
+    app = _get_or_create_mastodon_app(db, instance_url)
+
+    # State JWT with instance_url embedded
+    state_payload = {
+        "user_id": current_user.id,
+        "instance_url": instance_url,
+        "exp": datetime.utcnow() + timedelta(minutes=10),
+    }
+    state = jwt.encode(state_payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+    url = mastodon_service.get_authorize_url(instance_url, app.client_id, app.client_secret, cfg.MASTODON_REDIRECT_URI)
+    return {"redirect_url": url + f"&state={state}"}
+
+
+@router.get("/mastodon/callback")
+def mastodon_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Mastodon OAuth callback — exchange code for token."""
+    from app.config import settings as cfg
+
+    try:
+        payload = jwt.decode(state, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        user_id = payload["user_id"]
+        instance_url = payload["instance_url"]
+    except (JWTError, KeyError):
+        raise HTTPException(status_code=400, detail="Invalid state")
+
+    app = db.query(MastodonApp).filter(MastodonApp.instance_url == instance_url).first()
+    if not app:
+        raise HTTPException(status_code=400, detail="Unknown Mastodon instance")
+
+    try:
+        result = mastodon_service.exchange_code(
+            instance_url, app.client_id, app.client_secret, code, cfg.MASTODON_REDIRECT_URI
+        )
+    except Exception as exc:
+        return RedirectResponse(f"{cfg.FRONTEND_URL}/settings?error=mastodon_exchange_failed")
+
+    # Upsert SocialConnection
+    conn = (
+        db.query(SocialConnection)
+        .filter(SocialConnection.user_id == user_id, SocialConnection.platform == "mastodon")
+        .first()
+    )
+    if not conn:
+        conn = SocialConnection(user_id=user_id, platform="mastodon")
+        db.add(conn)
+
+    conn.access_token_enc = encrypt_value(result["access_token"])
+    conn.refresh_token_enc = None
+    conn.username = result["username"]
+    conn.instance_url = instance_url
+    conn.expires_at = None  # Mastodon tokens don't expire
+    conn.connected_at = datetime.utcnow()
+    db.commit()
+
+    return RedirectResponse(f"{cfg.FRONTEND_URL}/settings?connected=mastodon")

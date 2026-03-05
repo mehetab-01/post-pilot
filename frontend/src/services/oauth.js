@@ -17,3 +17,11 @@ export const disconnectPlatform = (platform) =>
 /** Refresh X/Twitter OAuth 2.0 tokens (expire every 2h) */
 export const refreshTwitterToken = () =>
   api.post(`${base}/twitter/refresh`).then((r) => r.data)
+
+/** Connect Bluesky with handle + app password */
+export const connectBluesky = (handle, appPassword) =>
+  api.post(`${base}/bluesky/connect`, { handle, app_password: appPassword }).then((r) => r.data)
+
+/** Start Mastodon OAuth — returns {redirect_url} for the specified instance */
+export const authorizeMastodon = (instanceUrl) =>
+  api.post(`${base}/mastodon/authorize`, { instance_url: instanceUrl }).then((r) => r.data.redirect_url)

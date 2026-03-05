@@ -1,4 +1,4 @@
-import { FaXTwitter, FaLinkedinIn, FaRedditAlien, FaInstagram, FaWhatsapp } from 'react-icons/fa6'
+import { FaXTwitter, FaLinkedinIn, FaRedditAlien, FaInstagram, FaWhatsapp, FaBluesky, FaMastodon } from 'react-icons/fa6'
 
 /**
  * Social platform configs.
@@ -83,5 +83,35 @@ export const PLATFORM_CONFIGS = [
     fixedStatus: 'share',
     infoCard: "PostPilot generates WhatsApp-optimized messages and opens WhatsApp with the text pre-filled. No API keys needed — it just works.",
     advancedKeys: null,
+  },
+  {
+    id: 'bluesky',
+    label: 'Bluesky',
+    Icon: FaBluesky,
+    color: '#0085ff',
+    rgb: '0,133,255',
+    desc: 'Post directly to Bluesky via app password',
+    required: false,
+    infoOnly: false,
+    oauthType: false,
+    credentialType: 'bluesky',
+    keys: [],
+    helperText: 'Create an app password at',
+    helperLink: { url: 'https://bsky.app/settings/app-passwords', label: 'bsky.app → Settings → App Passwords' },
+    note: 'Bluesky uses app passwords instead of OAuth. Your credentials are encrypted at rest.',
+  },
+  {
+    id: 'mastodon',
+    label: 'Mastodon',
+    Icon: FaMastodon,
+    color: '#6364ff',
+    rgb: '99,100,255',
+    desc: 'Post to any Mastodon instance',
+    required: false,
+    infoOnly: false,
+    oauthType: false,
+    credentialType: 'mastodon',
+    keys: [],
+    note: 'Mastodon tokens do not expire. You can connect to any Mastodon-compatible instance.',
   },
 ]

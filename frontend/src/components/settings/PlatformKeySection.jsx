@@ -8,6 +8,8 @@ import { KeyInput } from './KeyInput'
 import { SetupGuide } from './SetupGuide'
 import { ConnectionStatus } from './ConnectionStatus'
 import { OAuthConnect } from './OAuthConnect'
+import { BlueskyConnect } from './BlueskyConnect'
+import { MastodonConnect } from './MastodonConnect'
 import { saveKeys, testConnection } from '@/services/settings'
 import { getAuthorizeUrl, disconnectPlatform } from '@/services/oauth'
 
@@ -166,6 +168,84 @@ function WhatsAppSection({ config }) {
   )
 }
 
+// ── Bluesky credential section ─────────────────────────────────────────────────
+function BlueskySection({ config, connection, onConnectionChange }) {
+  const [open, setOpen] = useState(false)
+  const status = connection?.connected ? 'connected' : 'none'
+
+  return (
+    <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+      <SectionHeader
+        config={config}
+        status={status}
+        isOpen={open}
+        onToggle={() => setOpen((v) => !v)}
+      />
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="px-5 pb-5 pt-3 flex flex-col gap-4 border-t border-border">
+              <BlueskyConnect
+                connection={connection}
+                onConnectionChange={onConnectionChange}
+              />
+              {config.note && (
+                <p className="text-[11px] text-muted/80 italic leading-relaxed">{config.note}</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ── Mastodon instance connect section ──────────────────────────────────────────
+function MastodonSection({ config, connection, onConnectionChange }) {
+  const [open, setOpen] = useState(false)
+  const status = connection?.connected ? 'connected' : 'none'
+
+  return (
+    <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+      <SectionHeader
+        config={config}
+        status={status}
+        isOpen={open}
+        onToggle={() => setOpen((v) => !v)}
+      />
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="px-5 pb-5 pt-3 flex flex-col gap-4 border-t border-border">
+              <MastodonConnect
+                connection={connection}
+                onConnectionChange={onConnectionChange}
+              />
+              {config.note && (
+                <p className="text-[11px] text-muted/80 italic leading-relaxed">{config.note}</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ── Shared section header ──────────────────────────────────────────────────────
 function SectionHeader({ config, status, isOpen, onToggle }) {
   const { Icon, color, rgb, label, desc, required } = config
@@ -301,6 +381,26 @@ export function PlatformKeySection({ config, savedKeys, testResult, oauthConnect
   }
   if (config.id === 'whatsapp') {
     return <WhatsAppSection config={config} />
+  }
+  // Route Bluesky credential connect
+  if (config.credentialType === 'bluesky') {
+    return (
+      <BlueskySection
+        config={config}
+        connection={oauthConnections?.[config.id]}
+        onConnectionChange={onConnectionChange}
+      />
+    )
+  }
+  // Route Mastodon instance-based connect
+  if (config.credentialType === 'mastodon') {
+    return (
+      <MastodonSection
+        config={config}
+        connection={oauthConnections?.[config.id]}
+        onConnectionChange={onConnectionChange}
+      />
+    )
   }
   // Route OAuth variants
   if (config.oauthType) {
