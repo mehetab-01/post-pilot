@@ -521,23 +521,25 @@ export default function Dashboard() {
       {/* Templates row */}
       <TemplateRow onSelectTemplate={handleSelectTemplate} />
 
+      {/* Post Ideas panel: full width below templates, above context input */}
+      <div className="w-full mb-6">
+        <IdeasPanel
+          niche={context.trim() || undefined}
+          onSelectIdea={(idea) => {
+            setContext(idea.title + ' — ' + idea.description)
+            // Pre-select suggested platforms + tone
+            const newSelected = {}
+            ;(idea.platforms ?? []).forEach((p) => {
+              newSelected[p] = { tone: idea.tone || 'professional', options: {}, length: 'medium' }
+            })
+            if (Object.keys(newSelected).length > 0) setSelected(newSelected)
+          }}
+        />
+      </div>
+
       {/* Section 1: Context */}
       <div ref={section1Ref} className="mb-8 opacity-0">
-        <div className="flex items-center justify-between mb-3">
-          <SectionLabel>What do you want to post about?</SectionLabel>
-          <IdeasPanel
-            niche={context.trim() || undefined}
-            onSelectIdea={(idea) => {
-              setContext(idea.title + ' — ' + idea.description)
-              // Pre-select suggested platforms + tone
-              const newSelected = {}
-              ;(idea.platforms ?? []).forEach((p) => {
-                newSelected[p] = { tone: idea.tone || 'professional', options: {}, length: 'medium' }
-              })
-              if (Object.keys(newSelected).length > 0) setSelected(newSelected)
-            }}
-          />
-        </div>
+        <SectionLabel>What do you want to post about?</SectionLabel>
         <ContextInput value={context} onChange={setContext} />
         <div className="mt-3">
           <MediaUploader files={mediaFiles} onFilesChange={setMediaFiles} />
