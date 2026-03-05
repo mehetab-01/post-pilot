@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Compass, Clock, Settings, LogOut, LayoutTemplate, Zap } from 'lucide-react'
+import { Compass, Clock, CalendarClock, Settings, LogOut, LayoutTemplate, Zap, BarChart3 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import { clsx } from 'clsx'
@@ -11,6 +11,8 @@ import { UpgradeModal } from '@/components/dashboard/UpgradeModal'
 const NAV_ITEMS = [
   { to: '/dashboard', icon: Compass,        label: 'Create'    },
   { to: '/history',   icon: Clock,          label: 'History'   },
+  { to: '/scheduled', icon: CalendarClock,  label: 'Scheduled' },
+  { to: '/analytics', icon: BarChart3,      label: 'Analytics' },
   { to: '/templates', icon: LayoutTemplate, label: 'Templates' },
   { to: '/settings',  icon: Settings,       label: 'Settings'  },
 ]

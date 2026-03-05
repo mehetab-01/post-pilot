@@ -155,7 +155,8 @@ export function DangerZone() {
       await exportData()
       toast.success('Export downloaded')
     } catch (err) {
-      toast.error(err?.response?.data?.detail ?? 'Export failed')
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Export failed')
     } finally {
       setIsExporting(false)
     }

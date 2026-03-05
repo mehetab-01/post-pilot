@@ -15,10 +15,12 @@ import Register from '@/pages/Register'
 import Landing  from '@/pages/Landing'
 
 // Lazy — loaded only when first visited
-const Dashboard = lazy(() => import('@/pages/Dashboard'))
-const History   = lazy(() => import('@/pages/History'))
-const Settings  = lazy(() => import('@/pages/Settings'))
-const Templates = lazy(() => import('@/pages/Templates'))
+const Dashboard  = lazy(() => import('@/pages/Dashboard'))
+const History    = lazy(() => import('@/pages/History'))
+const Scheduled  = lazy(() => import('@/pages/Scheduled'))
+const Settings   = lazy(() => import('@/pages/Settings'))
+const Templates  = lazy(() => import('@/pages/Templates'))
+const Analytics  = lazy(() => import('@/pages/Analytics'))
 
 // Legal pages — lazy-loaded (filenames avoid ad-blocker keyword triggers)
 const PrivacyPolicy       = lazy(() => import('@/pages/legal/DataPolicy'))
@@ -110,12 +112,36 @@ function AnimatedRoutes() {
           }
         />
         <Route
+          path="/scheduled"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Suspense fallback={<PageFallback />}>
+                  <Scheduled />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/settings"
           element={
             <ProtectedRoute>
               <Layout>
                 <Suspense fallback={<PageFallback />}>
                   <Settings />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Suspense fallback={<PageFallback />}>
+                  <Analytics />
                 </Suspense>
               </Layout>
             </ProtectedRoute>
