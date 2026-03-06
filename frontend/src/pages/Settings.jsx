@@ -11,6 +11,7 @@ import { AiProviders } from '@/components/settings/AiProviders'
 import { PLATFORM_CONFIGS } from '@/components/settings/configs'
 import { getKeys } from '@/services/settings'
 import { getConnections } from '@/services/oauth'
+import { useUsage } from '@/contexts/UsageContext'
 
 // ── Loading skeleton ───────────────────────────────────────────────────────────
 function SectionSkeleton() {
@@ -31,7 +32,7 @@ function PageHeader() {
         Settings
       </h1>
       <p className="text-muted text-sm max-w-xl leading-relaxed">
-        Add your AI providers and connect your social accounts. API keys are encrypted
+        Connect your social accounts and manage your subscription. API keys are encrypted
         at rest with Fernet (AES-128-CBC + HMAC-SHA256).
       </p>
     </div>
@@ -40,6 +41,8 @@ function PageHeader() {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function Settings() {
+  const { plan } = useUsage()
+  const isPro = plan === 'pro'
   const [keysData, setKeysData]             = useState({})
   const [testResults, setTestResults]       = useState({})
   const [oauthConnections, setOauthConnections] = useState({})
@@ -121,15 +124,21 @@ export default function Settings() {
         {/* Right: settings sections */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
 
-          {/* ── AI Providers section ── */}
-          <div ref={(el) => (sectionsRef.current[0] = el)}>
-            <p className="text-[11px] font-medium text-muted uppercase tracking-widest mb-3">
-              AI Providers &amp; Fallback Chain
-            </p>
-            <div className="bg-surface border border-border rounded-2xl p-5">
-              <AiProviders />
+          {/* ── AI Providers section (Pro only) ── */}
+          {isPro && (
+            <div ref={(el) => (sectionsRef.current[0] = el)}>
+              <p className="text-[11px] font-medium text-muted uppercase tracking-widest mb-3">
+                Advanced — Your Own AI Keys
+              </p>
+              <div className="bg-surface border border-border rounded-2xl p-5">
+                <p className="text-xs text-muted mb-4 leading-relaxed">
+                  Optionally bring your own Claude, OpenAI, or Groq API key. When set, your key is used
+                  instead of PostPilot's shared key — giving you unlimited generations beyond plan limits.
+                </p>
+                <AiProviders />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Social platforms ── */}
           <div ref={(el) => (sectionsRef.current[1] = el)}>

@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import gsap from 'gsap'
-import { AlertTriangle } from 'lucide-react'
 import { PageTransition } from '@/components/layout/PageTransition'
 import { ContextInput } from '@/components/dashboard/ContextInput'
 import { MediaUploader } from '@/components/dashboard/MediaUploader'
@@ -22,29 +21,6 @@ import { getHumanizeScore, getOriginalityScore } from '@/services/analyze'
 import { getConnections } from '@/services/oauth'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUsage } from '@/contexts/UsageContext'
-
-// ── API key warning banner ─────────────────────────────────────────────────────
-function ApiKeyWarning({ onDismiss }) {
-  const navigate = useNavigate()
-  return (
-    <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl border border-amber/30 bg-amber/5 mb-8">
-      <AlertTriangle size={15} className="text-amber mt-0.5 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-text">
-          Add your{' '}
-          <span className="text-amber font-medium">Claude API key</span>
-          {' '}in Settings to start generating content.
-        </p>
-      </div>
-      <button
-        onClick={() => navigate('/settings')}
-        className="text-xs font-medium text-amber hover:underline flex-shrink-0 mt-0.5"
-      >
-        Go to Settings →
-      </button>
-    </div>
-  )
-}
 
 // ── Page header ────────────────────────────────────────────────────────────────
 function DashboardHeader({ username }) {
@@ -107,8 +83,6 @@ export default function Dashboard() {
   const [additionalInstr, setAdditional] = useState('')
   const [mediaFiles, setMediaFiles]      = useState([])
   const [selectedPlatforms, setSelected] = useState({})
-  const [showApiWarning, setApiWarning]  = useState(false)
-
   // ── Generation state ──
   const [isGenerating, setIsGenerating]  = useState(false)
   const [generatedPosts, setGenerated]   = useState({})
@@ -416,10 +390,7 @@ export default function Dashboard() {
         setGenerated({})
         return
       }
-      if ((typeof detail === 'string' && detail.toLowerCase().includes('api key')) || err?.response?.status === 401) {
-        setApiWarning(true)
-      }
-      toast.error((typeof detail === 'string' ? detail : detail?.message) || 'Generation failed. Check your Claude API key in Settings.')
+      toast.error((typeof detail === 'string' ? detail : detail?.message) || 'Generation failed. Please try again.')
       setGenerated({})
     } finally {
       setIsGenerating(false)
@@ -515,8 +486,6 @@ export default function Dashboard() {
   return (
     <PageTransition>
       <DashboardHeader username={user?.username} />
-
-      {showApiWarning && <ApiKeyWarning onDismiss={() => setApiWarning(false)} />}
 
       {/* Templates row */}
       <TemplateRow onSelectTemplate={handleSelectTemplate} />

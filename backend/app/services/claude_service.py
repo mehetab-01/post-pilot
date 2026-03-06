@@ -465,6 +465,102 @@ async def generate_ideas(
     return _json.loads(raw)
 
 
+_WEEK_SYSTEM_PROMPT = """You are a social media content strategist creating a weekly content plan.
+
+Given ONE topic/context, generate a full week of social media posts. Each day must have:
+1. A COMPLETELY DIFFERENT angle on the topic (not just rephrased)
+2. A specific platform assignment (match content type to platform strength)
+3. An appropriate tone for that platform
+4. A strategic reason for posting this on this day
+
+Content angle ideas to vary across the week:
+- Behind the scenes / making-of story
+- Educational breakdown / how-to
+- Personal reflection / lessons learned
+- Data/metrics/results sharing
+- Hot take / controversial opinion
+- Community engagement / question-asking
+- Celebration / milestone / gratitude
+- Comparison / vs post
+- Prediction / future outlook
+- Tutorial / step-by-step
+
+NEVER repeat the same angle twice in one week.
+NEVER just reformat the same content for different platforms.
+Each post must stand alone and provide unique value.
+
+Respond ONLY in valid JSON — no markdown fences, no backticks:
+{
+  "week_plan": [
+    {
+      "day": 1,
+      "day_name": "Monday",
+      "platform": "linkedin",
+      "tone": "storytelling",
+      "angle": "The origin story",
+      "why_this_day": "Monday = fresh start, professional audience active",
+      "content": "full post text ready to publish",
+      "hashtags": ["tag1", "tag2"],
+      "media_suggestion": "Add a photo of your workspace or team",
+      "best_time": "9:00 AM IST"
+    }
+  ],
+  "strategy_note": "Brief explanation of the overall content strategy for the week"
+}"""
+
+_STYLE_HINTS = {
+    "balanced":       "Mix educational, personal, and engaging content evenly. Vary tones and formats throughout the week.",
+    "aggressive":     "Maximize virality. Use bold takes, controversy, high-energy copy, and strong CTAs. Optimize for shares and engagement.",
+    "educational":    "Every post should teach something. Lead with value, use frameworks, numbered lists, and actionable insights.",
+    "personal-brand": "Focus on storytelling, vulnerability, behind-the-scenes moments, and authentic personal voice. Build connection.",
+}
+
+
+async def generate_week_plan(
+    api_key: str,
+    context: str,
+    platforms: list[str],
+    days: int = 7,
+    style: str = "balanced",
+    model: str = "claude-sonnet-4-20250514",
+) -> dict:
+    """Generate a full weekly content plan from a single context/idea."""
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+
+    style_hint = _STYLE_HINTS.get(style, _STYLE_HINTS["balanced"])
+    platform_str = ", ".join(platforms) if platforms else "twitter, linkedin, reddit, instagram"
+
+    prompt = (
+        f"Generate a {days}-day content plan for the following topic/context:\n\n"
+        f"CONTEXT: {context}\n\n"
+        f"AVAILABLE PLATFORMS (distribute smartly across the week): {platform_str}\n\n"
+        f"CONTENT STYLE: {style_hint}\n\n"
+        f"Generate exactly {days} posts — one per day (Day 1 through Day {days}). "
+        f"Each post on a DIFFERENT platform with a DIFFERENT angle. "
+        f"Match platform to content type (LinkedIn=professional insights, Twitter=hot takes/threads, "
+        f"Reddit=community value, Instagram=visual storytelling, Bluesky=casual/indie)."
+    )
+
+    message = await client.messages.create(
+        model=model,
+        max_tokens=6000,
+        system=_WEEK_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = message.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1]
+        if raw.endswith("```"):
+            raw = raw.rsplit("```", 1)[0]
+        raw = raw.strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Claude returned invalid JSON: {exc}\n\nRaw:\n{raw}") from exc
+
+
 async def humanize_post(
     api_key: str,
     platform: str,
