@@ -1,19 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.models import ApiKey, Media, Payment, Post, User
+from app.limiter import limiter
+from app.models.models import ApiKey, BlacklistedToken, Media, Payment, Post, User
 from app.models.social_connection import SocialConnection
 from app.models.ai_provider import AiProvider
 from app.schemas.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
-from app.security import create_access_token, get_current_user, hash_password, verify_password
+from app.security import create_access_token, decode_access_token, get_current_user, hash_password, verify_password
+
+_bearer = HTTPBearer()
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
         raise HTTPException(
@@ -35,7 +42,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
@@ -50,6 +58,30 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/logout")
+def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Invalidate the current JWT so it cannot be reused."""
+    payload = decode_access_token(credentials.credentials)
+    if payload:
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if jti and exp:
+            # Purge tokens older than 7 days to keep the table small
+            db.query(BlacklistedToken).filter(
+                BlacklistedToken.expires_at < datetime.utcnow()
+            ).delete()
+            db.add(BlacklistedToken(
+                jti=jti,
+                expires_at=datetime.utcfromtimestamp(exp),
+            ))
+            db.commit()
+    return {"success": True, "message": "Logged out successfully"}
 
 
 # ── Delete account ────────────────────────────────────────────────────────────

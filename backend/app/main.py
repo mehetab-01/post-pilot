@@ -1,24 +1,31 @@
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
-from app.database import Base, engine
-from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers, analyze, templates, usage, billing, schedule, ideas, analytics
+from app.database import Base, engine as db_engine
+from app.routes import auth, generate, history, media, post, settings, oauth, ai_providers, analyze, templates, usage, billing, schedule, ideas, analytics, admin
+from app.routes import engine as engine_routes
+
+from app.limiter import limiter
 
 app = FastAPI(
     title="PostPilot API",
     description="AI social media content generator and auto-poster",
     version="1.0.0",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 from app.config import settings as _cfg  # noqa: E402
 
-_cors_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+_cors_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://postpilot.tabcrypt.in"]
 if _cfg.EXTRA_CORS_ORIGINS:
     _cors_origins += [o.strip() for o in _cfg.EXTRA_CORS_ORIGINS.split(",") if o.strip()]
 
@@ -46,6 +53,20 @@ app.include_router(billing.router)
 app.include_router(schedule.router)
 app.include_router(ideas.router)
 app.include_router(analytics.router)
+app.include_router(admin.router)
+app.include_router(engine_routes.router)
+
+
+# ── Secure headers middleware ──────────────────────────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
@@ -56,12 +77,12 @@ def on_startup():
     import app.models.ai_provider        # noqa: F401
     import app.models.models             # noqa: F401  (registers Template)
     # Create all tables if they don't exist
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=db_engine)
 
     # ── Auto-migrate: add any missing columns to existing tables ──────────
     from sqlalchemy import inspect as sa_inspect, text
-    with engine.connect() as conn:
-        existing = {c["name"] for c in sa_inspect(engine).get_columns("users")}
+    with db_engine.connect() as conn:
+        existing = {c["name"] for c in sa_inspect(db_engine).get_columns("users")}
         _new_cols = [
             ("plan",                "VARCHAR DEFAULT 'free'"),
             ("generations_used",    "INTEGER DEFAULT 0"),
@@ -81,14 +102,14 @@ def on_startup():
 
     # ── Auto-migrate: add missing columns to templates ────────────────────
     try:
-        tpl_existing = {c["name"] for c in sa_inspect(engine).get_columns("templates")}
+        tpl_existing = {c["name"] for c in sa_inspect(db_engine).get_columns("templates")}
         _tpl_cols = [
             ("tier",            "VARCHAR NOT NULL DEFAULT 'free'"),
             ("preview_example", "TEXT"),
             ("icon",            "VARCHAR"),
             ("color",           "VARCHAR"),
         ]
-        with engine.connect() as conn2:
+        with db_engine.connect() as conn2:
             for col_name, col_def in _tpl_cols:
                 if col_name not in tpl_existing:
                     conn2.execute(text(f"ALTER TABLE templates ADD COLUMN {col_name} {col_def}"))
@@ -96,18 +117,37 @@ def on_startup():
     except Exception:
         pass  # templates table doesn't exist yet — create_all will handle it
 
+    # ── Auto-migrate: create ai_cost_logs if missing ──────────────────────
+    try:
+        if "ai_cost_logs" not in sa_inspect(db_engine).get_table_names():
+            pass  # create_all above handles it
+    except Exception:
+        pass
+
     # ── Auto-migrate: add missing columns to social_connections ───────────
     try:
-        sc_existing = {c["name"] for c in sa_inspect(engine).get_columns("social_connections")}
+        sc_existing = {c["name"] for c in sa_inspect(db_engine).get_columns("social_connections")}
         if "instance_url" not in sc_existing:
-            with engine.connect() as conn3:
+            with db_engine.connect() as conn3:
                 conn3.execute(text("ALTER TABLE social_connections ADD COLUMN instance_url VARCHAR"))
                 conn3.commit()
     except Exception:
         pass  # table doesn't exist yet — create_all will handle it
 
-    # Ensure upload directory exists
+    # ── Validate required env vars ────────────────────────────────────────
     from app.config import settings as cfg
+    _errors = []
+    if cfg.JWT_SECRET == "change-this-to-a-random-string":
+        _errors.append("JWT_SECRET is still the default value — set a secure random string in .env")
+    if not cfg.FERNET_KEY:
+        _errors.append("FERNET_KEY is not set — encrypted values cannot be decrypted without it")
+    if not cfg.POSTPILOT_CLAUDE_API_KEY:
+        _errors.append("POSTPILOT_CLAUDE_API_KEY is not set — AI generation will fail for all users")
+    if _errors:
+        msg = "\n".join(f"  ✗ {e}" for e in _errors)
+        raise RuntimeError(f"PostPilot startup aborted — missing required config:\n{msg}")
+
+    # Ensure upload directory exists
     os.makedirs(cfg.UPLOAD_DIR, exist_ok=True)
 
     # Seed built-in templates (skips if already seeded)

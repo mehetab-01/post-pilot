@@ -1,15 +1,34 @@
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+# Patterns that indicate prompt injection attempts
+_INJECTION_PATTERNS = re.compile(
+    r"(ignore\s+(previous|all|above)\s+instructions?|"
+    r"you\s+are\s+now\s+|"
+    r"system\s*:\s*|"
+    r"<\s*/?system\s*>|"
+    r"new\s+instructions?\s*:|"
+    r"disregard\s+(all|previous|the\s+above))",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_text(v: str) -> str:
+    """Strip prompt injection patterns from user-provided text."""
+    if v and _INJECTION_PATTERNS.search(v):
+        v = _INJECTION_PATTERNS.sub("[removed]", v)
+    return v
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
-    username: str
-    password: str
-    email: Optional[str] = None
+    username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
+    password: str = Field(min_length=8, max_length=128)
+    email: Optional[str] = Field(default=None, max_length=254)
 
 
 class LoginRequest(BaseModel):
@@ -109,10 +128,17 @@ class MediaResponse(BaseModel):
 # ── Generate ──────────────────────────────────────────────────────────────────
 
 class GenerateRequest(BaseModel):
-    context: str
+    context: str = Field(min_length=1, max_length=10_000)
     platforms: Dict[str, Dict[str, Any]]
-    additional_instructions: Optional[str] = None
+    additional_instructions: Optional[str] = Field(default=None, max_length=2_000)
     length: str = "medium"
+
+    @field_validator("context", "additional_instructions", mode="before")
+    @classmethod
+    def sanitize_inputs(cls, v):
+        if v is None:
+            return v
+        return _sanitize_text(str(v))
 
 
 class RegenerateRequest(BaseModel):

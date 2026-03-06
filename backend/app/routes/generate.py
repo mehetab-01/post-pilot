@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,6 +17,7 @@ from app.schemas.schemas import (
     RegenerateRequest,
     RegenerateResponse,
 )
+from app.limiter import limiter
 from app.plans import check_generation_limit, check_platform_allowed, check_platform_limit, check_tone_allowed, increment_generation, require_plan
 from app.security import get_current_user
 from app.services import ai_router
@@ -36,7 +37,9 @@ def _get_tone(platform_options: dict) -> str:
 
 
 @router.post("", response_model=GenerateResponse, status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def generate(
+    request: Request,
     payload: GenerateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

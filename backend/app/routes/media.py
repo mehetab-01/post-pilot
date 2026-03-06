@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import aiofiles
+import magic
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -28,6 +29,9 @@ _ALLOWED_EXTENSIONS = {
     ".webm": "video",
 }
 
+# Magic bytes → allowed MIME prefixes
+_ALLOWED_MIME_PREFIXES = ("image/", "video/mp4", "video/webm", "video/x-matroska")
+
 
 def _classify_extension(filename: str) -> str:
     ext = Path(filename).suffix.lower()
@@ -39,6 +43,19 @@ def _classify_extension(filename: str) -> str:
             detail=f"Unsupported file type '{ext}'. Allowed: {allowed}",
         )
     return media_type
+
+
+def _validate_magic_bytes(contents: bytes, filename: str) -> None:
+    """Verify actual file content matches allowed types — prevents extension spoofing."""
+    try:
+        detected = magic.from_buffer(contents[:2048], mime=True)
+    except Exception:
+        return  # if magic fails, fall through (extension check already passed)
+    if not any(detected.startswith(p) for p in _ALLOWED_MIME_PREFIXES):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File content does not match an allowed media type (detected: {detected})",
+        )
 
 
 @router.post("/upload", response_model=MediaResponse, status_code=status.HTTP_201_CREATED)
@@ -59,6 +76,9 @@ async def upload_media(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File too large. Maximum size is 50 MB.",
         )
+
+    # Verify actual file bytes match allowed media types
+    _validate_magic_bytes(contents, file.filename)
 
     # Build a unique filename to avoid collisions
     ext = Path(file.filename).suffix.lower()

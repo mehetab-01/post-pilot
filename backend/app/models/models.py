@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     JSON,
@@ -177,3 +178,40 @@ class PostMetrics(Base):
     fetched_at      = Column(DateTime, default=datetime.utcnow)
 
     post = relationship("Post")
+
+
+class ContentPlan(Base):
+    """A generated weekly content calendar."""
+    __tablename__ = "content_plans"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    context    = Column(Text, nullable=False)
+    style      = Column(String, nullable=False, default="balanced")
+    week_plan  = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status     = Column(String, nullable=False, default="active")
+
+
+class BlacklistedToken(Base):
+    """JWT tokens invalidated on logout. Cleaned up after 7 days."""
+    __tablename__ = "blacklisted_tokens"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    jti        = Column(String, nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AiCostLog(Base):
+    """Per-call cost tracking for platform-owned AI key usage."""
+    __tablename__ = "ai_cost_logs"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider   = Column(String, nullable=False)   # "claude" | "openai" | "groq"
+    model      = Column(String, nullable=False)
+    tokens_in  = Column(Integer, nullable=False, default=0)
+    tokens_out = Column(Integer, nullable=False, default=0)
+    cost_usd   = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

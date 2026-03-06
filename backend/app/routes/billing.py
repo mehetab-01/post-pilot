@@ -8,12 +8,13 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import razorpay
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings as cfg
 from app.database import get_db
+from app.limiter import limiter
 from app.models.models import Payment, User
 from app.plans import PLAN_CONFIG, get_plan_config
 from app.security import get_current_user
@@ -138,7 +139,9 @@ def check_plan_expiry(user: User, db: Session) -> None:
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/create-order", response_model=CreateOrderResponse)
+@limiter.limit("3/minute")
 def create_order(
+    request: Request,
     payload: CreateOrderRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -302,6 +305,64 @@ def billing_status(
         last_payment_currency=last_paid.currency if last_paid else None,
         payments=payment_list,
     )
+
+
+@router.post("/webhook", include_in_schema=False)
+async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Razorpay server-to-server webhook — safety net for when the browser closes
+    before verify-payment completes.
+    Set RAZORPAY_WEBHOOK_SECRET in .env to enable signature verification.
+    """
+    body = await request.body()
+
+    # Verify webhook signature if secret is configured
+    if cfg.RAZORPAY_WEBHOOK_SECRET:
+        sig = request.headers.get("x-razorpay-signature", "")
+        expected = hmac.new(
+            cfg.RAZORPAY_WEBHOOK_SECRET.encode(), body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, sig):
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    import json as _json
+    try:
+        event = _json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    event_type = event.get("event")
+
+    if event_type == "payment.captured":
+        payload = event.get("payload", {}).get("payment", {}).get("entity", {})
+        order_id = payload.get("order_id")
+        payment_id = payload.get("id")
+        notes = payload.get("notes", {})
+        user_id = notes.get("user_id")
+        plan = notes.get("plan")
+        billing_cycle = notes.get("billing_cycle", "monthly")
+
+        if user_id and plan and plan in PLAN_CONFIG and plan != "free":
+            user = db.query(User).filter(User.id == int(user_id)).first()
+            if user and user.plan != plan:
+                _activate_plan(user, plan, billing_cycle, db)
+                # Update payment record if it exists
+                pay = db.query(Payment).filter(Payment.razorpay_order_id == order_id).first()
+                if pay and pay.status != "paid":
+                    pay.razorpay_payment_id = payment_id
+                    pay.status = "paid"
+                    db.commit()
+
+    elif event_type == "payment.failed":
+        payload = event.get("payload", {}).get("payment", {}).get("entity", {})
+        order_id = payload.get("order_id")
+        if order_id:
+            pay = db.query(Payment).filter(Payment.razorpay_order_id == order_id).first()
+            if pay and pay.status == "created":
+                pay.status = "failed"
+                db.commit()
+
+    return {"status": "ok"}
 
 
 @router.post("/cancel")

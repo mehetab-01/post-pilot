@@ -4,15 +4,21 @@ Usage tracking & plan upgrade endpoints.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.config import settings as cfg
 from app.database import get_db
 from app.models.models import User
 from app.plans import PLAN_CONFIG, build_usage_response, get_plan_config
 from app.security import get_current_user
 from app.routes.billing import check_plan_expiry
+
+
+def _require_admin(x_admin_key: str = Header(None)):
+    if not cfg.ADMIN_SECRET or x_admin_key != cfg.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 router = APIRouter(prefix="/api", tags=["usage"])
 
@@ -40,7 +46,7 @@ def get_usage(
     return build_usage_response(current_user, db)
 
 
-@router.post("/upgrade", response_model=UpgradeResponse)
+@router.post("/upgrade", response_model=UpgradeResponse, dependencies=[Depends(_require_admin)])
 def upgrade_plan(
     payload: UpgradeRequest,
     db: Session = Depends(get_db),

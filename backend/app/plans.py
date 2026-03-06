@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 _BASE_PLATFORMS = ["twitter", "linkedin", "reddit", "instagram", "whatsapp"]
 _STARTER_PLATFORMS = _BASE_PLATFORMS + ["bluesky", "mastodon"]
-_PRO_PLATFORMS = _STARTER_PLATFORMS + ["threads"]
+_PRO_PLATFORMS = _STARTER_PLATFORMS  # Threads removed — integration not yet available
 
 PLAN_CONFIG = {
     "free": {
@@ -197,8 +197,6 @@ def check_platform_allowed(user, platforms: dict) -> None:
         if platform not in allowed:
             # Determine minimum required plan
             min_plan = "starter"
-            if platform in ("threads",):
-                min_plan = "pro"
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={

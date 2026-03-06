@@ -15,7 +15,7 @@ from app.schemas.schemas import (
 )
 from app.security import get_current_user
 from app.services import linkedin_service, reddit_service, twitter_service, bluesky_service, mastodon_service
-from app.services.encryption import decrypt_value
+from app.services.encryption import decrypt_value, encrypt_value
 from app.plans import require_plan
 
 router = APIRouter(prefix="/api/post", tags=["post"])
