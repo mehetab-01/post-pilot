@@ -20,7 +20,8 @@ const History    = lazy(() => import('@/pages/History'))
 const Scheduled  = lazy(() => import('@/pages/Scheduled'))
 const Settings   = lazy(() => import('@/pages/Settings'))
 const Templates  = lazy(() => import('@/pages/Templates'))
-const Analytics  = lazy(() => import('@/pages/Analytics'))
+const Analytics      = lazy(() => import('@/pages/Analytics'))
+const ContentEngine  = lazy(() => import('@/pages/ContentEngine'))
 
 // Legal pages — lazy-loaded (filenames avoid ad-blocker keyword triggers)
 const PrivacyPolicy       = lazy(() => import('@/pages/legal/DataPolicy'))
@@ -154,6 +155,18 @@ function AnimatedRoutes() {
               <Layout>
                 <Suspense fallback={<PageFallback />}>
                   <Templates />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/engine"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Suspense fallback={<PageFallback />}>
+                  <ContentEngine />
                 </Suspense>
               </Layout>
             </ProtectedRoute>
