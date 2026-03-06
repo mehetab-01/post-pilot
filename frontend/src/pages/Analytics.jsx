@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion'
 import {
   Eye, Heart, Share2, MessageCircle, TrendingUp,
@@ -38,7 +39,8 @@ function fmtNum(n) {
 }
 
 // ── Overview stat card ────────────────────────────────────────────────────────
-function StatCard({ label, value, icon: Icon, color }) {
+function StatCard({ label, value, icon, color }) {
+  const Icon = icon
   return (
     <div
       className="rounded-2xl p-5 flex flex-col gap-1"
@@ -48,7 +50,7 @@ function StatCard({ label, value, icon: Icon, color }) {
       }}
     >
       <div className="flex items-center gap-2 text-muted text-xs font-medium mb-1">
-        <Icon size={14} style={{ color }} />
+        {Icon && <Icon size={14} style={{ color }} />}
         {label}
       </div>
       <span className="text-2xl font-bold text-heading">{value}</span>
