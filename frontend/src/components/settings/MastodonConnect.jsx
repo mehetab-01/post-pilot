@@ -53,7 +53,7 @@ export function MastodonConnect({ connection, onConnectionChange }) {
         <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-green-900/60 bg-green-950/40">
           <CheckCircle2 size={14} className="text-green-400 flex-shrink-0" />
           <span className="text-sm text-green-400 font-medium">
-            Connected as @{connection.username}
+            Connected as @{(connection.username || '').replace(/^@/, '')}
             {connection.instance_url && (
               <span className="text-green-400/70"> on {connection.instance_url}</span>
             )}

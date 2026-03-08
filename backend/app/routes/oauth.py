@@ -421,10 +421,12 @@ def bluesky_connect(
 
     try:
         session_data = login_and_export(payload.handle.strip(), payload.app_password.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Bluesky login failed: {exc}",
+            detail="Bluesky login failed. Check your handle and app password.",
         )
 
     # Upsert SocialConnection

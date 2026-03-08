@@ -15,11 +15,25 @@ def login_and_export(handle: str, app_password: str) -> dict:
     Returns:
         dict with keys: session_string, username, did
     """
+    # Normalize handle — strip leading @
+    handle = handle.lstrip("@").strip()
+    if not handle:
+        raise ValueError("Handle cannot be empty")
+
     client = Client()
-    profile = client.login(handle, app_password)
+    try:
+        profile = client.login(handle, app_password)
+    except Exception as exc:
+        msg = str(exc)
+        if "invalid" in msg.lower() or "password" in msg.lower() or "identifier" in msg.lower():
+            raise ValueError("Invalid handle or app password. Make sure you're using an App Password (not your main password).")
+        if "not found" in msg.lower() or "resolve" in msg.lower():
+            raise ValueError(f"Handle '{handle}' not found. Check the format e.g. yourname.bsky.social")
+        raise ValueError(f"Bluesky login error: {msg}")
+
     return {
         "session_string": client.export_session_string(),
-        "username": f"@{profile.handle}",
+        "username": profile.handle,  # store without @; frontend adds it
         "did": profile.did,
     }
 

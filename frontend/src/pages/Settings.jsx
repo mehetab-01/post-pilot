@@ -64,7 +64,14 @@ export default function Settings() {
       window.history.replaceState({}, '', '/settings')
     }
     if (error) {
-      toast.error(`OAuth error: ${error}`)
+      const errorMessages = {
+        mastodon_exchange_failed: 'Mastodon authorization failed. Please try connecting again.',
+        mastodon_invalid_state: 'Mastodon OAuth session expired. Please try again.',
+        invalid_state: 'OAuth session expired. Please try again.',
+        linkedin_exchange_failed: 'LinkedIn authorization failed. Please try again.',
+        twitter_exchange_failed: 'Twitter authorization failed. Please try again.',
+      }
+      toast.error(errorMessages[error] || `Connection failed: ${error}`)
       window.history.replaceState({}, '', '/settings')
     }
   }, [location.search])

@@ -20,7 +20,7 @@ export function BlueskyConnect({ connection, onConnectionChange }) {
     setError(null)
     try {
       const res = await connectBluesky(handle.trim(), appPassword.trim())
-      toast.success(`Connected as @${res.username}`)
+      toast.success(`Connected as @${res.username.replace(/^@/, '')}`)
       onConnectionChange?.('bluesky', { connected: true, username: res.username })
       setHandle('')
       setAppPassword('')
@@ -49,7 +49,7 @@ export function BlueskyConnect({ connection, onConnectionChange }) {
         <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-green-900/60 bg-green-950/40">
           <CheckCircle2 size={14} className="text-green-400 flex-shrink-0" />
           <span className="text-sm text-green-400 font-medium">
-            Connected as @{connection.username}
+            Connected as @{(connection.username || '').replace(/^@/, '')}
           </span>
         </div>
         <button
