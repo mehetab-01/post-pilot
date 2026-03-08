@@ -127,13 +127,23 @@ export default function Settings() {
           {/* ── AI Providers section (Pro only) ── */}
           {isPro && (
             <div ref={(el) => (sectionsRef.current[0] = el)}>
-              <p className="text-[11px] font-medium text-muted uppercase tracking-widest mb-3">
-                Advanced — Your Own AI Keys
-              </p>
-              <div className="bg-surface border border-border rounded-2xl p-5">
-                <p className="text-xs text-muted mb-4 leading-relaxed">
-                  Optionally bring your own Claude, OpenAI, or Groq API key. When set, your key is used
-                  instead of PostPilot's shared key — giving you unlimited generations beyond plan limits.
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[11px] font-medium text-muted uppercase tracking-widest">
+                  Pro Feature — Upgrade Your AI Model
+                </p>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber/10 text-amber border border-amber/20">
+                  PRO
+                </span>
+              </div>
+              <div className="bg-surface border border-amber/20 rounded-2xl p-5">
+                <p className="text-sm font-medium text-heading mb-1">Use your own Claude key for higher quality</p>
+                <p className="text-xs text-muted mb-1 leading-relaxed">
+                  PostPilot uses <span className="text-amber font-medium">Claude Haiku 4.5</span> by default — fast and cost-efficient for most content.
+                  As a Pro user, you can plug in your own Anthropic API key to unlock <span className="text-amber font-medium">Claude Sonnet or Opus</span> for
+                  richer, more nuanced posts.
+                </p>
+                <p className="text-xs text-muted/70 mb-4">
+                  Your key is encrypted at rest and used only for your generations. It takes priority over the shared platform key.
                 </p>
                 <AiProviders />
               </div>
