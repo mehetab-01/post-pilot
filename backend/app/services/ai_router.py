@@ -18,6 +18,11 @@ from app.models.ai_provider import AiProvider
 from app.services.encryption import decrypt_value
 from app.services import claude_service, openai_compat_service
 
+
+class AiRateLimitError(Exception):
+    """Raised when all AI providers are rate-limited. Returns 429 to client."""
+    pass
+
 # Cost per million tokens (USD) — actual Anthropic pricing (Mar 2025)
 # Haiku 4.5: $1/$5 | Sonnet 4.6: $3/$15 | Opus 4.6: $5/$25
 _COST_PER_MTOK = {
@@ -72,6 +77,13 @@ def _platform_providers() -> list[tuple[str, str, str]]:
     return result
 
 
+def _is_rate_limit_err(exc: Exception) -> bool:
+    """Return True if the exception indicates a provider rate limit (429)."""
+    name = type(exc).__name__.lower()
+    msg = str(exc).lower()
+    return "ratelimit" in name or "rate_limit" in name or "429" in msg or "rate limit" in msg
+
+
 async def _call(provider: str, key: str, model: str, fn: str, **kwargs):
     """Dispatch to the right service by provider name and function."""
     svc = claude_service if provider == "claude" else openai_compat_service
@@ -109,6 +121,8 @@ async def generate_posts(
             return result
         except Exception as exc:
             last_err = exc
+            if _is_rate_limit_err(exc):
+                raise AiRateLimitError("PostPilot AI is busy right now. Please try again in a moment.")
             continue
     raise ValueError(f"AI generation failed. Last error: {last_err}")
 

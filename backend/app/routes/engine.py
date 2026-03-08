@@ -16,6 +16,7 @@ from app.models.models import ContentPlan, User
 from app.plans import require_plan
 from app.security import get_current_user
 from app.services import ai_router
+from app.services.ai_router import AiRateLimitError
 
 router = APIRouter(prefix="/api/engine", tags=["engine"])
 
@@ -72,6 +73,8 @@ async def generate_week(
             days=payload.days,
             style=payload.style,
         )
+    except AiRateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 

@@ -21,6 +21,7 @@ from app.limiter import limiter
 from app.plans import check_generation_limit, check_platform_allowed, check_platform_limit, check_tone_allowed, increment_generation, require_plan
 from app.security import get_current_user
 from app.services import ai_router
+from app.services.ai_router import AiRateLimitError
 
 router = APIRouter(prefix="/api/generate", tags=["generate"])
 
@@ -72,6 +73,8 @@ async def generate(
             additional_instructions=payload.additional_instructions,
             length=payload.length,
         )
+    except AiRateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Exception as exc:
@@ -138,6 +141,8 @@ async def regenerate(
             context=payload.context,
             platforms={payload.platform: platform_options},
         )
+    except AiRateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Exception as exc:
@@ -195,6 +200,8 @@ async def enhance(
             tone=payload.tone,
             additional_instructions=payload.additional_instructions,
         )
+    except AiRateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Exception as exc:
@@ -226,6 +233,8 @@ async def humanize(
             current_content=payload.content,
             tone=payload.tone,
         )
+    except AiRateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Exception as exc:
