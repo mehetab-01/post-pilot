@@ -378,6 +378,11 @@ export default function Dashboard() {
       const detail = err?.response?.data?.detail ?? ''
       // Handle plan limit errors from backend (403)
       const detailObj = typeof detail === 'object' ? detail : {}
+      if (err?.response?.status === 429) {
+        toast.error((typeof detail === 'string' && detail) ? detail : 'PostPilot AI is busy right now. Please try again in a moment.')
+        setGenerated({})
+        return
+      }
       if (err?.response?.status === 403 && detailObj.error) {
         const msg = detailObj.error === 'limit_reached'
           ? 'Generation limit reached'
