@@ -18,9 +18,10 @@ from app.models.ai_provider import AiProvider
 from app.services.encryption import decrypt_value
 from app.services import claude_service, openai_compat_service
 
-# Cost per million tokens (USD) — rough estimates per provider
+# Cost per million tokens (USD) — actual Anthropic pricing (Mar 2025)
+# Haiku 4.5: $1/$5 | Sonnet 4.6: $3/$15 | Opus 4.6: $5/$25
 _COST_PER_MTOK = {
-    "claude": {"in": 3.0,  "out": 15.0},
+    "claude": {"in": 1.0,  "out": 5.0},   # Haiku 4.5 (default platform model)
     "openai": {"in": 2.5,  "out": 10.0},
     "groq":   {"in": 0.1,  "out": 0.1},
     "gemini": {"in": 0.5,  "out": 1.5},

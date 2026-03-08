@@ -48,7 +48,7 @@ class Settings:
 
     # PostPilot-owned AI keys — used for ALL users (no setup required)
     POSTPILOT_CLAUDE_API_KEY: str = os.getenv("POSTPILOT_CLAUDE_API_KEY", "")
-    POSTPILOT_AI_MODEL: str       = os.getenv("POSTPILOT_AI_MODEL", "claude-sonnet-4-20250514")
+    POSTPILOT_AI_MODEL: str       = os.getenv("POSTPILOT_AI_MODEL", "claude-haiku-4-5-20251001")
     POSTPILOT_OPENAI_KEY: str     = os.getenv("POSTPILOT_OPENAI_KEY", "")
     POSTPILOT_GROQ_KEY: str       = os.getenv("POSTPILOT_GROQ_KEY", "")
 
