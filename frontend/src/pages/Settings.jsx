@@ -70,6 +70,7 @@ export default function Settings() {
         invalid_state: 'OAuth session expired. Please try again.',
         linkedin_exchange_failed: 'LinkedIn authorization failed. Please try again.',
         twitter_exchange_failed: 'Twitter authorization failed. Please try again.',
+        reddit_auth_failed: 'Reddit authorization failed. Check your Client ID and Secret in Settings.',
       }
       toast.error(errorMessages[error] || `Connection failed: ${error}`)
       window.history.replaceState({}, '', '/settings')

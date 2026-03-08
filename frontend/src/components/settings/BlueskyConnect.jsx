@@ -68,7 +68,7 @@ export function BlueskyConnect({ connection, onConnectionChange }) {
       <div>
         <label className="block text-xs text-muted mb-1.5">Bluesky Handle</label>
         <div className="flex items-center gap-0 rounded-xl bg-zinc-900 border border-border focus-within:border-[#0085ff]/50 transition-colors overflow-hidden">
-          <span className="px-3 py-2 text-sm text-muted/70 select-none border-r border-border">@</span>
+          <span className="px-3 py-2 text-sm text-muted/70 select-none">@</span>
           <input
             type="text"
             value={handle}

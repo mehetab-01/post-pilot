@@ -328,7 +328,8 @@ async def callback(
             else:
                 token_data = await _exchange_reddit(code)
     except HTTPException as exc:
-        return RedirectResponse(f"{settings.FRONTEND_URL}/settings?error={exc.detail[:60]}")
+        slug = "reddit_auth_failed" if platform == "reddit" else f"{platform}_exchange_failed"
+        return RedirectResponse(f"{settings.FRONTEND_URL}/settings?error={slug}")
 
     # Upsert SocialConnection
     conn = (
