@@ -67,13 +67,16 @@ export function BlueskyConnect({ connection, onConnectionChange }) {
     <form onSubmit={handleConnect} className="flex flex-col gap-3">
       <div>
         <label className="block text-xs text-muted mb-1.5">Bluesky Handle</label>
-        <input
-          type="text"
-          value={handle}
-          onChange={(e) => setHandle(e.target.value)}
-          placeholder="yourname.bsky.social"
-          className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-border text-sm text-text placeholder:text-muted/50 focus:outline-none focus:border-[#0085ff]/50 transition-colors"
-        />
+        <div className="flex items-center gap-0 rounded-xl bg-zinc-900 border border-border focus-within:border-[#0085ff]/50 transition-colors overflow-hidden">
+          <span className="px-3 py-2 text-sm text-muted/70 select-none border-r border-border">@</span>
+          <input
+            type="text"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value.replace(/^@+/, ''))}
+            placeholder="yourname.bsky.social"
+            className="flex-1 px-3 py-2 bg-transparent text-sm text-text placeholder:text-muted/50 focus:outline-none"
+          />
+        </div>
       </div>
       <div>
         <label className="block text-xs text-muted mb-1.5">App Password</label>
