@@ -313,7 +313,8 @@ async def callback(
     Handle the OAuth callback from the platform.
     NOTE: No JWT Bearer — user identity is recovered from the signed state token.
     """
-    if platform not in ALLOWED_PLATFORMS:
+    # mastodon and bluesky have their own dedicated routes
+    if platform not in ALLOWED_PLATFORMS or platform in ("mastodon", "bluesky"):
         return RedirectResponse(f"{settings.FRONTEND_URL}/settings?error=bad_platform")
 
     # Decode state (Twitter also extracts code_verifier)
