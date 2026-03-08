@@ -68,24 +68,28 @@ def _get_user_providers(db: Session, user_id: int) -> list[AiProvider]:
 
 def _platform_providers_for_plan(user_plan: str) -> list[tuple[str, str, str]]:
     """
-    Return PostPilot's platform-owned (provider, key, model) based on user plan.
-    Free users get Groq only (free tier). Starter/Pro get Claude → OpenAI → Groq.
+    Return PostPilot's platform-owned (provider, key, model).
+    TESTING MODE: All plans use Groq. Restore tiered routing below when ready.
     """
-    plan = user_plan or "free"
-    if plan == "free":
-        # Free users: Groq only (llama-3.3-70b, free tier, $0 cost)
-        if cfg.POSTPILOT_GROQ_KEY:
-            return [("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile")]
-        return []
-    # Starter / Pro: Claude first, then OpenAI, then Groq fallback
-    result = []
-    if cfg.POSTPILOT_CLAUDE_API_KEY:
-        result.append(("claude", cfg.POSTPILOT_CLAUDE_API_KEY, cfg.POSTPILOT_AI_MODEL))
-    if cfg.POSTPILOT_OPENAI_KEY:
-        result.append(("openai", cfg.POSTPILOT_OPENAI_KEY, "gpt-4o-mini"))
+    # ── TESTING: all plans → Groq ─────────────────────────────────────────────
     if cfg.POSTPILOT_GROQ_KEY:
-        result.append(("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile"))
-    return result
+        return [("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile")]
+    return []
+
+    # ── PRODUCTION TIERED ROUTING (uncomment to restore) ─────────────────────
+    # plan = user_plan or "free"
+    # if plan == "free":
+    #     if cfg.POSTPILOT_GROQ_KEY:
+    #         return [("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile")]
+    #     return []
+    # result = []
+    # if cfg.POSTPILOT_CLAUDE_API_KEY:
+    #     result.append(("claude", cfg.POSTPILOT_CLAUDE_API_KEY, cfg.POSTPILOT_AI_MODEL))
+    # if cfg.POSTPILOT_OPENAI_KEY:
+    #     result.append(("openai", cfg.POSTPILOT_OPENAI_KEY, "gpt-4o-mini"))
+    # if cfg.POSTPILOT_GROQ_KEY:
+    #     result.append(("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile"))
+    # return result
 
 
 def _is_rate_limit_err(exc: Exception) -> bool:
