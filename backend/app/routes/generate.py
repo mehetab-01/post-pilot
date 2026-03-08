@@ -17,7 +17,6 @@ from app.schemas.schemas import (
     RegenerateRequest,
     RegenerateResponse,
 )
-from app.limiter import limiter
 from app.plans import check_generation_limit, check_platform_allowed, check_platform_limit, check_tone_allowed, increment_generation, require_plan
 from app.security import get_current_user
 from app.services import ai_router
@@ -38,7 +37,6 @@ def _get_tone(platform_options: dict) -> str:
 
 
 @router.post("", response_model=GenerateResponse, status_code=status.HTTP_200_OK)
-@limiter.limit("30/minute")
 async def generate(
     request: Request,
     payload: GenerateRequest,

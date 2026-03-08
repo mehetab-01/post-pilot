@@ -108,6 +108,7 @@ async def generate_posts(
     length: str = "medium",
 ) -> dict:
     last_err: Exception = Exception("No AI providers configured")
+    rate_limited = False
     for provider, key, model in _iter_all(db, user_id):
         try:
             result = await _call(
@@ -122,8 +123,10 @@ async def generate_posts(
         except Exception as exc:
             last_err = exc
             if _is_rate_limit_err(exc):
-                raise AiRateLimitError("PostPilot AI is busy right now. Please try again in a moment.")
+                rate_limited = True
             continue
+    if rate_limited:
+        raise AiRateLimitError("PostPilot AI is busy right now. Please try again in a moment.")
     raise ValueError(f"AI generation failed. Last error: {last_err}")
 
 
