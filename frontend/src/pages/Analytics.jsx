@@ -112,6 +112,7 @@ export default function Analytics() {
   const isPro = plan === 'pro'
 
   const load = useCallback(async () => {
+    if (plan === 'free') { setLoading(false); setError('locked'); return }
     setLoading(true)
     setError(null)
     try {
@@ -131,7 +132,7 @@ export default function Analytics() {
     } finally {
       setLoading(false)
     }
-  }, [sort, isPro])
+  }, [sort, isPro, plan])
 
   useEffect(() => { load() }, [load])
 
