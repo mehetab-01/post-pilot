@@ -70,6 +70,7 @@ async def generate(
             platforms=payload.platforms,
             additional_instructions=payload.additional_instructions,
             length=payload.length,
+            user_plan=current_user.plan or "free",
         )
     except AiRateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
@@ -138,6 +139,7 @@ async def regenerate(
             user_id=current_user.id,
             context=payload.context,
             platforms={payload.platform: platform_options},
+            user_plan=current_user.plan or "free",
         )
     except AiRateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
@@ -197,6 +199,7 @@ async def enhance(
             current_content=payload.content,
             tone=payload.tone,
             additional_instructions=payload.additional_instructions,
+            user_plan=current_user.plan or "free",
         )
     except AiRateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
@@ -230,6 +233,7 @@ async def humanize(
             platform=payload.platform,
             current_content=payload.content,
             tone=payload.tone,
+            user_plan=current_user.plan or "free",
         )
     except AiRateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))

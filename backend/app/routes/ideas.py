@@ -86,6 +86,7 @@ async def generate_ideas(
         niche=payload.niche,
         platforms=payload.platforms,
         recent_contexts=recent_contexts,
+        user_plan=current_user.plan or "free",
     )
 
     # Log usage

@@ -3,10 +3,11 @@ AI provider fallback chain.
 
 Priority order:
 1. User's own AiProvider rows (ordered by priority) — Pro user override
-2. PostPilot platform-owned keys from environment (POSTPILOT_CLAUDE_API_KEY, etc.)
+2. PostPilot platform-owned keys — tier-gated:
+   - Free users  → Groq only (POSTPILOT_GROQ_KEY, free tier, Llama 3.3)
+   - Starter/Pro → Claude first, then OpenAI, then Groq as fallback
 
-This means every user can generate immediately after signup with zero setup.
-Pro users who add their own keys get those used first (saves platform costs).
+This keeps Claude API costs reserved for paying users.
 """
 from typing import Optional
 from datetime import datetime
@@ -65,15 +66,25 @@ def _get_user_providers(db: Session, user_id: int) -> list[AiProvider]:
     )
 
 
-def _platform_providers() -> list[tuple[str, str, str]]:
-    """Return PostPilot's own (provider, key, model) fallbacks from env config."""
+def _platform_providers_for_plan(user_plan: str) -> list[tuple[str, str, str]]:
+    """
+    Return PostPilot's platform-owned (provider, key, model) based on user plan.
+    Free users get Groq only (free tier). Starter/Pro get Claude → OpenAI → Groq.
+    """
+    plan = user_plan or "free"
+    if plan == "free":
+        # Free users: Groq only (llama-3.3-70b, free tier, $0 cost)
+        if cfg.POSTPILOT_GROQ_KEY:
+            return [("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile")]
+        return []
+    # Starter / Pro: Claude first, then OpenAI, then Groq fallback
     result = []
     if cfg.POSTPILOT_CLAUDE_API_KEY:
         result.append(("claude", cfg.POSTPILOT_CLAUDE_API_KEY, cfg.POSTPILOT_AI_MODEL))
     if cfg.POSTPILOT_OPENAI_KEY:
         result.append(("openai", cfg.POSTPILOT_OPENAI_KEY, "gpt-4o-mini"))
     if cfg.POSTPILOT_GROQ_KEY:
-        result.append(("groq", cfg.POSTPILOT_GROQ_KEY, "llama3-70b-8192"))
+        result.append(("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile"))
     return result
 
 
@@ -91,11 +102,11 @@ async def _call(provider: str, key: str, model: str, fn: str, **kwargs):
     return await getattr(svc, fn)(api_key=key, model=model, **extra, **kwargs)
 
 
-def _iter_all(db: Session, user_id: int):
-    """Yield (provider, key, model) — user providers first, then platform."""
+def _iter_all(db: Session, user_id: int, user_plan: str = "free"):
+    """Yield (provider, key, model) — user's own keys first, then platform keys."""
     for p in _get_user_providers(db, user_id):
         yield p.provider, decrypt_value(p.encrypted_key), p.model
-    yield from _platform_providers()
+    yield from _platform_providers_for_plan(user_plan)
 
 
 async def generate_posts(
@@ -106,10 +117,11 @@ async def generate_posts(
     media_info: Optional[list] = None,
     additional_instructions: Optional[str] = None,
     length: str = "medium",
+    user_plan: str = "free",
 ) -> dict:
     last_err: Exception = Exception("No AI providers configured")
     rate_limited = False
-    for provider, key, model in _iter_all(db, user_id):
+    for provider, key, model in _iter_all(db, user_id, user_plan):
         try:
             result = await _call(
                 provider, key, model, "generate_posts",
@@ -137,9 +149,10 @@ async def enhance_post(
     current_content: str,
     tone: str,
     additional_instructions: Optional[str] = None,
+    user_plan: str = "free",
 ) -> str:
     last_err: Exception = Exception("No AI providers configured")
-    for provider, key, model in _iter_all(db, user_id):
+    for provider, key, model in _iter_all(db, user_id, user_plan):
         try:
             result = await _call(
                 provider, key, model, "enhance_post",
@@ -159,9 +172,10 @@ async def score_content(
     user_id: int,
     content: str,
     platform: str,
+    user_plan: str = "free",
 ) -> dict:
     last_err: Exception = Exception("No AI providers configured")
-    for provider, key, model in _iter_all(db, user_id):
+    for provider, key, model in _iter_all(db, user_id, user_plan):
         try:
             result = await _call(
                 provider, key, model, "score_content",
@@ -180,9 +194,10 @@ async def check_originality(
     user_id: int,
     content: str,
     platform: str,
+    user_plan: str = "free",
 ) -> dict:
     last_err: Exception = Exception("No AI providers configured")
-    for provider, key, model in _iter_all(db, user_id):
+    for provider, key, model in _iter_all(db, user_id, user_plan):
         try:
             result = await _call(
                 provider, key, model, "check_originality",
@@ -202,9 +217,10 @@ async def humanize_post(
     platform: str,
     current_content: str,
     tone: str,
+    user_plan: str = "free",
 ) -> str:
     last_err: Exception = Exception("No AI providers configured")
-    for provider, key, model in _iter_all(db, user_id):
+    for provider, key, model in _iter_all(db, user_id, user_plan):
         try:
             result = await _call(
                 provider, key, model, "humanize_post",
@@ -248,9 +264,10 @@ async def generate_ideas(
     niche: Optional[str] = None,
     platforms: Optional[list[str]] = None,
     recent_contexts: Optional[list[str]] = None,
+    user_plan: str = "free",
 ) -> list[dict]:
     last_err: Exception = Exception("No AI providers configured")
-    for provider, key, model in _iter_all(db, user_id):
+    for provider, key, model in _iter_all(db, user_id, user_plan):
         try:
             result = await _call(
                 provider, key, model, "generate_ideas",

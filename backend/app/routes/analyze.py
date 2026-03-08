@@ -28,6 +28,7 @@ async def humanize_score(
             user_id=current_user.id,
             content=payload.content,
             platform=payload.platform,
+            user_plan=current_user.plan or "free",
         )
     except ValueError:
         # Bad JSON from AI — return a neutral fallback rather than a 4xx
@@ -76,6 +77,7 @@ async def originality_check(
             user_id=current_user.id,
             content=payload.content,
             platform=payload.platform,
+            user_plan=current_user.plan or "free",
         )
     except ValueError:
         return OriginalityCheckResponse(
