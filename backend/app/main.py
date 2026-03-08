@@ -141,8 +141,6 @@ def on_startup():
         _errors.append("JWT_SECRET is still the default value — set a secure random string in .env")
     if not cfg.FERNET_KEY:
         _errors.append("FERNET_KEY is not set — encrypted values cannot be decrypted without it")
-    if not cfg.POSTPILOT_CLAUDE_API_KEY:
-        _errors.append("POSTPILOT_CLAUDE_API_KEY is not set — AI generation will fail for all users")
     if _errors:
         msg = "\n".join(f"  ✗ {e}" for e in _errors)
         raise RuntimeError(f"PostPilot startup aborted — missing required config:\n{msg}")
