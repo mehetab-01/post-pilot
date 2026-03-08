@@ -465,7 +465,14 @@ def _get_or_create_mastodon_app(db: Session, instance_url: str) -> MastodonApp:
         return app
 
     from app.config import settings as cfg
-    client_id, client_secret = mastodon_service.register_app(instance_url, cfg.MASTODON_REDIRECT_URI)
+    try:
+        client_id, client_secret = mastodon_service.register_app(instance_url, cfg.MASTODON_REDIRECT_URI)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not connect to Mastodon instance '{instance_url}'. "
+                   f"Make sure you entered the instance domain only (e.g. mastodon.social), not your username. Error: {exc}",
+        )
 
     app = MastodonApp(
         instance_url=instance_url,
@@ -491,6 +498,28 @@ def mastodon_authorize(
     from app.config import settings as cfg
 
     instance_url = payload.instance_url.strip().lower().rstrip("/")
+
+    # Strip protocol if user pasted a full URL (https://mastodon.social or http://...)
+    for prefix in ("https://", "http://"):
+        if instance_url.startswith(prefix):
+            instance_url = instance_url[len(prefix):]
+
+    # Handle @user@instance format (e.g. @tabcrypt@mastodon.social → mastodon.social)
+    if instance_url.startswith("@") and instance_url.count("@") >= 2:
+        instance_url = instance_url.split("@")[-1]
+    elif instance_url.startswith("@"):
+        instance_url = instance_url.lstrip("@")
+
+    # Strip any trailing path (mastodon.social/@tabcrypt → mastodon.social)
+    instance_url = instance_url.split("/")[0]
+
+    # Reject obvious non-instance inputs (no dot = likely a plain username)
+    if "." not in instance_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Enter the Mastodon instance domain (e.g. mastodon.social), not your username.",
+        )
+
     app = _get_or_create_mastodon_app(db, instance_url)
 
     # State JWT with instance_url embedded
@@ -501,7 +530,13 @@ def mastodon_authorize(
     }
     state = jwt.encode(state_payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
-    url = mastodon_service.get_authorize_url(instance_url, app.client_id, app.client_secret, cfg.MASTODON_REDIRECT_URI)
+    try:
+        url = mastodon_service.get_authorize_url(instance_url, app.client_id, app.client_secret, cfg.MASTODON_REDIRECT_URI)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to build authorization URL for '{instance_url}': {exc}",
+        )
     return {"redirect_url": url + f"&state={state}"}
 
 
