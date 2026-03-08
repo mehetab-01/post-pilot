@@ -85,10 +85,12 @@ export function MastodonConnect({ connection, onConnectionChange }) {
     <form onSubmit={handleConnect} className="flex flex-col gap-3">
       {/* Username input */}
       <div>
-        <label className="block text-xs text-muted mb-1.5">Your Mastodon Username</label>
+        <label htmlFor="masto-username" className="block text-xs text-muted mb-1.5">Your Mastodon Username</label>
         <div className="flex items-center gap-0 rounded-xl bg-zinc-900 border border-border focus-within:border-[#6364ff]/50 transition-colors overflow-hidden">
           <span className="px-3 py-2 text-sm text-muted/70 select-none">@</span>
           <input
+            id="masto-username"
+            name="masto-username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value.replace(/[@\s]/g, ''))}

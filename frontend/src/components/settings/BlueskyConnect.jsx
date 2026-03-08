@@ -66,10 +66,12 @@ export function BlueskyConnect({ connection, onConnectionChange }) {
   return (
     <form onSubmit={handleConnect} className="flex flex-col gap-3">
       <div>
-        <label className="block text-xs text-muted mb-1.5">Bluesky Handle</label>
+        <label htmlFor="bsky-handle" className="block text-xs text-muted mb-1.5">Bluesky Handle</label>
         <div className="flex items-center gap-0 rounded-xl bg-zinc-900 border border-border focus-within:border-[#0085ff]/50 transition-colors overflow-hidden">
           <span className="px-3 py-2 text-sm text-muted/70 select-none">@</span>
           <input
+            id="bsky-handle"
+            name="bsky-handle"
             type="text"
             value={handle}
             onChange={(e) => setHandle(e.target.value.replace(/^@+/, ''))}
@@ -79,8 +81,10 @@ export function BlueskyConnect({ connection, onConnectionChange }) {
         </div>
       </div>
       <div>
-        <label className="block text-xs text-muted mb-1.5">App Password</label>
+        <label htmlFor="bsky-app-password" className="block text-xs text-muted mb-1.5">App Password</label>
         <input
+          id="bsky-app-password"
+          name="bsky-app-password"
           type="password"
           value={appPassword}
           onChange={(e) => setAppPassword(e.target.value)}
