@@ -203,6 +203,13 @@ export default function Dashboard() {
       if (already) {
         const next = { ...prev }
         delete next[platformId]
+        // Also remove stale generated post so PublishBar count stays accurate
+        setGenerated((gp) => {
+          if (!gp[platformId]) return gp
+          const ngp = { ...gp }
+          delete ngp[platformId]
+          return ngp
+        })
         return next
       }
       // Check if platform is allowed by plan tier

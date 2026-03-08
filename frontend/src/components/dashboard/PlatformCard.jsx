@@ -15,13 +15,14 @@ const LENGTH_OPTIONS = [
 
 export function PlatformCard({ platform, isSelected, selection, onToggle, onToneChange, onOptionChange, onLengthChange, isToneLocked, isLocked, requiredPlan }) {
   const cardRef = useRef(null)
-  const { id, label, Icon, color, rgb, desc } = platform
+  const { id, label, Icon, color, rgb, desc, comingSoon } = platform
 
   const selectedTone   = selection?.tone ?? DEFAULT_TONE
   const selectedLength = selection?.length ?? 'medium'
   const options        = selection?.options ?? {}
 
   function handleToggle() {
+    if (comingSoon) return // Block interaction
     if (isLocked) {
       onToggle(id, true) // Signal that this is a locked platform click
       return
@@ -43,11 +44,13 @@ export function PlatformCard({ platform, isSelected, selection, onToggle, onTone
       ref={cardRef}
       onClick={handleToggle}
       className={clsx(
-        'rounded-2xl border cursor-pointer transition-colors duration-200 overflow-hidden',
+        'rounded-2xl border transition-colors duration-200 overflow-hidden',
         'focus-within:outline-none',
-        isSelected ? 'bg-surface' : 'bg-surface hover:border-zinc-600',
+        comingSoon
+          ? 'bg-surface opacity-50 cursor-not-allowed'
+          : isSelected ? 'bg-surface cursor-pointer' : 'bg-surface hover:border-zinc-600 cursor-pointer',
       )}
-      style={isSelected ? {
+      style={isSelected && !comingSoon ? {
         borderColor: `rgba(${rgb},0.7)`,
         boxShadow: `0 0 0 1px rgba(${rgb},0.2), 0 0 24px rgba(${rgb},0.08)`,
       } : { borderColor: '#27272a' }}
@@ -93,14 +96,21 @@ export function PlatformCard({ platform, isSelected, selection, onToggle, onTone
           <p className={clsx('text-xs', isLocked ? 'text-zinc-600' : 'text-muted')}>{desc}</p>
         </div>
 
-        {/* Selection indicator */}
-        <div
-          className={clsx(
-            'w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all duration-200',
-            isLocked ? 'border-zinc-700' : isSelected ? 'border-transparent' : 'border-zinc-600',
-          )}
-          style={isSelected && !isLocked ? { background: color } : {}}
-        />
+        {/* Selection indicator or Coming Soon badge */}
+        {comingSoon ? (
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide flex-shrink-0"
+            style={{ background: 'rgba(113,113,122,0.15)', color: '#71717a', border: '1px solid rgba(113,113,122,0.3)' }}>
+            Soon
+          </span>
+        ) : (
+          <div
+            className={clsx(
+              'w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all duration-200',
+              isLocked ? 'border-zinc-700' : isSelected ? 'border-transparent' : 'border-zinc-600',
+            )}
+            style={isSelected && !isLocked ? { background: color } : {}}
+          />
+        )}
       </div>
 
       {/* Expanded options (when selected) */}
