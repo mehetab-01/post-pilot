@@ -116,8 +116,12 @@ export default function Dashboard() {
   const selectedPlatformIds = Object.keys(selectedPlatforms).filter(
     (p) => !!selectedPlatforms[p],
   )
+  // Only show generated posts for currently selected platforms — prevents stale posts from previous generates
+  const visibleGeneratedPosts = Object.fromEntries(
+    Object.entries(generatedPosts).filter(([p]) => !!selectedPlatforms[p])
+  )
   const canGenerate       = context.trim().length > 0 && selectedPlatformIds.length > 0 && !limitReached
-  const hasGeneratedPosts = Object.keys(generatedPosts).length > 0
+  const hasGeneratedPosts = Object.keys(visibleGeneratedPosts).length > 0
 
   // Page title
   useEffect(() => { document.title = 'Create | PostPilot' }, [])
@@ -562,7 +566,7 @@ export default function Dashboard() {
       {hasGeneratedPosts && (
         <div className="pb-28">
           <PostPreviewGrid
-            generatedPosts={generatedPosts}
+            generatedPosts={visibleGeneratedPosts}
             selectedPlatforms={selectedPlatforms}
             context={context}
             connections={connections}
@@ -584,7 +588,7 @@ export default function Dashboard() {
       {/* Sticky publish bar */}
       {hasGeneratedPosts && (
         <PublishBar
-          generatedPosts={generatedPosts}
+          generatedPosts={visibleGeneratedPosts}
           publishResults={publishResults}
           onPublishAll={() => setShowPublish(true)}
           isPublishing={isPublishing}
@@ -595,7 +599,7 @@ export default function Dashboard() {
       <PublishModal
         isOpen={showPublishModal}
         onClose={() => setShowPublish(false)}
-        generatedPosts={generatedPosts}
+        generatedPosts={visibleGeneratedPosts}
         publishResults={publishResults}
         onPublishAll={handlePublishAll}
         onScheduleAll={handleScheduleAll}
