@@ -113,8 +113,8 @@ async def generate(
 
     db.commit()
 
-    # Track usage
-    increment_generation(current_user, db, count=len(generated))
+    # Track usage — 1 generation per button click regardless of platform count
+    increment_generation(current_user, db, count=1)
 
     return GenerateResponse(generated=generated, posting_tips=posting_tips)
 
