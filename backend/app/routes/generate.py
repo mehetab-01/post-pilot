@@ -38,7 +38,7 @@ def _get_tone(platform_options: dict) -> str:
 
 
 @router.post("", response_model=GenerateResponse, status_code=status.HTTP_200_OK)
-@limiter.limit("10/minute")
+@limiter.limit("30/minute")
 async def generate(
     request: Request,
     payload: GenerateRequest,
