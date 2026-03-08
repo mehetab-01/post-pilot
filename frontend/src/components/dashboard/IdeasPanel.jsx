@@ -57,7 +57,7 @@ export function IdeasPanel({ onSelectIdea, niche }) {
   }
 
   return (
-    <div className="inline-block align-top">
+    <div className="w-full">
       <button
         onClick={open ? () => setOpen(false) : handleOpen}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber/80 hover:text-amber bg-amber/5 hover:bg-amber/10 border border-amber/20 transition-colors mb-2"
