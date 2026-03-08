@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.ai_provider import AiProvider
 from app.models.models import User
+from app.plans import require_plan
 from app.security import get_current_user
 from app.services.encryption import encrypt_value, decrypt_value
 
@@ -97,6 +98,7 @@ def add_provider(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_plan(current_user, "pro", "Custom AI providers")
     if payload.provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unsupported provider: {payload.provider}")
     if not payload.api_key.strip():
