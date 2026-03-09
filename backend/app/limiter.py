@@ -17,9 +17,10 @@ def get_real_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-# default_limits applies to every @limiter.limit() decorated route as a floor.
-# Per-route limits (stricter) always win. This acts as a global DDoS safety net.
+# No default_limits — only routes with explicit @limiter.limit() are rate-limited.
+# Auth endpoints keep their per-route limits (register: 3/min, login: 5/min).
+# Generate has no decorator so slowapi never touches it.
 limiter = Limiter(
     key_func=get_real_ip,
-    default_limits=["300/minute", "2000/hour"],
+    default_limits=[],
 )
