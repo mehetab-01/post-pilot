@@ -68,28 +68,17 @@ def _get_user_providers(db: Session, user_id: int) -> list[AiProvider]:
 
 def _platform_providers_for_plan(user_plan: str) -> list[tuple[str, str, str]]:
     """
-    Return PostPilot's platform-owned (provider, key, model).
-    TESTING MODE: All plans use Groq. Restore tiered routing below when ready.
+    Provider chain: Groq first (free/fast), Claude as fallback for ALL plans.
+    If Groq's daily limit is exhausted, Claude catches it automatically.
     """
-    # ── TESTING: all plans → Groq ─────────────────────────────────────────────
+    result = []
     if cfg.POSTPILOT_GROQ_KEY:
-        return [("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile")]
-    return []
-
-    # ── PRODUCTION TIERED ROUTING (uncomment to restore) ─────────────────────
-    # plan = user_plan or "free"
-    # if plan == "free":
-    #     if cfg.POSTPILOT_GROQ_KEY:
-    #         return [("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile")]
-    #     return []
-    # result = []
-    # if cfg.POSTPILOT_CLAUDE_API_KEY:
-    #     result.append(("claude", cfg.POSTPILOT_CLAUDE_API_KEY, cfg.POSTPILOT_AI_MODEL))
-    # if cfg.POSTPILOT_OPENAI_KEY:
-    #     result.append(("openai", cfg.POSTPILOT_OPENAI_KEY, "gpt-4o-mini"))
-    # if cfg.POSTPILOT_GROQ_KEY:
-    #     result.append(("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile"))
-    # return result
+        result.append(("groq", cfg.POSTPILOT_GROQ_KEY, "llama-3.3-70b-versatile"))
+    if cfg.POSTPILOT_CLAUDE_API_KEY:
+        result.append(("claude", cfg.POSTPILOT_CLAUDE_API_KEY, cfg.POSTPILOT_AI_MODEL))
+    if cfg.POSTPILOT_OPENAI_KEY:
+        result.append(("openai", cfg.POSTPILOT_OPENAI_KEY, "gpt-4o-mini"))
+    return result
 
 
 def _is_rate_limit_err(exc: Exception) -> bool:
